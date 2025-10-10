@@ -1,0 +1,1283 @@
+
+local GUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/BloodLetters/Ash-Libs/refs/heads/main/source.lua"))()
+
+GUI:CreateMain({
+    Name = "Ashlabs",
+    title = "Nex Hub",
+    ToggleUI = "LeftControl",
+    WindowIcon = "home", -- you can use lucid icons
+    -- WindowHeight = 600, -- default height
+    -- WindowWidth = 800, -- default width
+    Theme = {
+        Background = Color3.fromRGB(25, 25, 35),
+        Secondary = Color3.fromRGB(35, 35, 45),
+        Accent = Color3.fromRGB(138, 43, 226),
+        Text = Color3.fromRGB(255, 255, 255),
+        TextSecondary = Color3.fromRGB(180, 180, 180),
+        Border = Color3.fromRGB(50, 50, 60),
+        NavBackground = Color3.fromRGB(20, 20, 30)
+    },
+    Blur = { -- Buggy
+        Enable = false, -- transparent option
+        value = 0.2
+    },
+    Config = { -- not implemented yet
+        Enabled = false,
+    }
+})
+
+local main = GUI:CreateTab("Main", "home") -- You can use IconID we didnt impleemnt lucid or any external icons
+
+GUI:CreateSection({
+    parent = main, 
+    text = "Main"
+})
+
+GUI:CreateToggle({
+    parent = main, 
+    text = "Aimbot Beta", 
+    default = false, 
+    callback = function(state)
+        print("Toggle state:", state)
+    end
+})
+
+
+GUI:CreateToggle({
+    parent = main, 
+    text = "Toggle Me", 
+    default = false, 
+    callback = function(state)
+        print("Toggle state:", state)
+    end
+})
+
+
+
+GUI:CreateToggle({
+    parent = main, 
+    text = "Toggle Me", 
+    default = false, 
+    callback = function(state)
+        print("Toggle state:", state)
+    end
+})
+
+
+local visual = GUI:CreateTab("Visual", "eye") -- You can use IconID we didnt impleemnt lucid or any external icons
+
+GUI:CreateSection({
+    parent = visual, 
+    text = "Visual"
+})
+
+
+GUI:CreateToggle({
+    parent = visual,
+    text = "Esp Inimigos",
+    default = true,
+    callback = function(state)
+        _G.IsEspPlayerEnabled = state
+
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+        local CoreGui = game:GetService("CoreGui")
+        local Camera = game:GetService("Workspace").CurrentCamera
+        local localPlayer = Players.LocalPlayer
+
+        local espSettings = {
+            enabled = state,
+            maxDistance = 2000,
+            forceMaterial = true,
+            forceTransparency = 0.5,
+            outlineEnabled = true,
+            glowEnabled = true,
+            nameTagEnabled = true,
+            nameTagSize = 14,
+            nameTagColor = Color3.fromRGB(0, 255, 255),
+            checkInterval = 0.5,
+            playerColor = Color3.fromRGB(0, 255, 255),
+        }
+
+        local espData = {}
+        local playerConnections = {}
+        local nameTags = {}
+        local monitorThread = nil
+
+        local function forcePartVisibility(part)
+            if not part then return end
+            part.LocalTransparencyModifier = 0
+            part.CastShadow = true
+            if espSettings.forceMaterial then
+                part.Material = Enum.Material.ForceField
+                part.Transparency = espSettings.forceTransparency
+            end
+        end
+
+        local function updateNameTag(player, character)
+            if not espSettings.nameTagEnabled or not character or not character:FindFirstChild("HumanoidRootPart") then return end
+            local humanoidRootPart = character.HumanoidRootPart
+            if nameTags[player] then nameTags[player]:Destroy() nameTags[player] = nil end
+
+            local billboard = Instance.new("BillboardGui")
+            billboard.Name = "FixedNameESP"
+            billboard.Adornee = humanoidRootPart
+            billboard.Size = UDim2.new(0, 200, 0, 50)
+            billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+            billboard.AlwaysOnTop = true
+            billboard.MaxDistance = espSettings.maxDistance
+            billboard.Parent = CoreGui
+
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Size = UDim2.new(1, 0, 1, 0)
+            nameLabel.Text = player.Name
+            nameLabel.TextColor3 = espSettings.nameTagColor
+            nameLabel.TextSize = espSettings.nameTagSize
+            nameLabel.Font = Enum.Font.SourceSansBold
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.TextStrokeTransparency = 0.5
+            nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+            nameLabel.Parent = billboard
+
+            nameTags[player] = billboard
+
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.Died:Connect(function()
+                    if nameTags[player] then
+                        nameTags[player]:Destroy()
+                        nameTags[player] = nil
+                    end
+                end)
+            end
+        end
+
+        local function cleanPlayerEsp(player)
+            if espData[player] then
+                for _, conn in pairs(espData[player].connections) do
+                    conn:Disconnect()
+                end
+                if espData[player].highlight then espData[player].highlight:Destroy() end
+                espData[player] = nil
+            end
+            if nameTags[player] then
+                nameTags[player]:Destroy()
+                nameTags[player] = nil
+            end
+        end
+
+        local function applyEsp(player, character)
+            if not character then return end
+            cleanPlayerEsp(player)
+
+            espData[player] = {parts = {}, connections = {}}
+
+            local function processPart(part)
+                if part:IsA("BasePart") or part:IsA("MeshPart") or part:IsA("Part") then
+                    forcePartVisibility(part)
+                    local conn = part:GetPropertyChangedSignal("Transparency"):Connect(function()
+                        forcePartVisibility(part)
+                    end)
+                    table.insert(espData[player].connections, conn)
+                end
+            end
+
+            for _, part in pairs(character:GetDescendants()) do
+                processPart(part)
+            end
+
+            local descendantAddedConn = character.DescendantAdded:Connect(function(part)
+                processPart(part)
+            end)
+            table.insert(espData[player].connections, descendantAddedConn)
+
+            if espSettings.glowEnabled then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "UniversalESPHighlight"
+                highlight.Adornee = character
+                highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                highlight.FillColor = espSettings.playerColor
+                highlight.OutlineColor = espSettings.playerColor
+                highlight.FillTransparency = 0.3
+                highlight.Parent = CoreGui
+                espData[player].highlight = highlight
+            end
+
+            if espSettings.nameTagEnabled then
+                updateNameTag(player, character)
+            end
+
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid then
+                local diedConn = humanoid.Died:Connect(function()
+                    if nameTags[player] then
+                        nameTags[player]:Destroy()
+                        nameTags[player] = nil
+                    end
+                    delay(3, function()
+                        if player.Character and _G.IsEspPlayerEnabled then
+                            applyEsp(player, player.Character)
+                        end
+                    end)
+                end)
+                table.insert(espData[player].connections, diedConn)
+            end
+        end
+
+        local function removeEsp(player)
+            cleanPlayerEsp(player)
+            if playerConnections[player] then
+                for _, conn in pairs(playerConnections[player]) do
+                    conn:Disconnect()
+                end
+                playerConnections[player] = nil
+            end
+        end
+
+        local function monitorAllPlayers()
+            while _G.IsEspPlayerEnabled do
+                wait(espSettings.checkInterval)
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player ~= localPlayer then
+                        local character = player.Character
+                        if character and character:FindFirstChild("HumanoidRootPart") then
+                            local distance = 0
+                            if localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                                distance = (character.HumanoidRootPart.Position - localPlayer.Character.HumanoidRootPart.Position).Magnitude
+                            end
+                            if distance <= espSettings.maxDistance or distance == 0 then
+                                if not espData[player] or espData[player].character ~= character then
+                                    applyEsp(player, character)
+                                    espData[player].character = character
+                                end
+                            else
+                                removeEsp(player)
+                            end
+                        else
+                            removeEsp(player)
+                        end
+                    end
+                end
+            end
+            for player, _ in pairs(espData) do
+                removeEsp(player)
+            end
+        end
+
+        local function setupAutoReconnect()
+            for player, connections in pairs(playerConnections) do
+                for _, conn in pairs(connections) do
+                    conn:Disconnect()
+                end
+            end
+            playerConnections = {}
+
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= localPlayer then
+                    playerConnections[player] = {}
+                    local charAddedConn = player.CharacterAdded:Connect(function(character)
+                        if _G.IsEspPlayerEnabled then
+                            wait(2)
+                            applyEsp(player, character)
+                        end
+                    end)
+                    table.insert(playerConnections[player], charAddedConn)
+                    local charRemovingConn = player.CharacterRemoving:Connect(function()
+                        cleanPlayerEsp(player)
+                    end)
+                    table.insert(playerConnections[player], charRemovingConn)
+                    if player.Character and _G.IsEspPlayerEnabled then
+                        applyEsp(player, player.Character)
+                    end
+                end
+            end
+
+            Players.PlayerAdded:Connect(function(player)
+                if player ~= localPlayer then
+                    playerConnections[player] = {}
+                    local charAddedConn = player.CharacterAdded:Connect(function(character)
+                        if _G.IsEspPlayerEnabled then
+                            wait(2)
+                            applyEsp(player, character)
+                        end
+                    end)
+                    table.insert(playerConnections[player], charAddedConn)
+                    local charRemovingConn = player.CharacterRemoving:Connect(function()
+                        cleanPlayerEsp(player)
+                    end)
+                    table.insert(playerConnections[player], charRemovingConn)
+                end
+            end)
+        end
+
+        if state then
+            setupAutoReconnect()
+            monitorThread = task.spawn(monitorAllPlayers)
+            print("ESP Inimigos Ativado!")
+        else
+            _G.IsEspPlayerEnabled = false
+            for _, player in pairs(Players:GetPlayers()) do
+                removeEsp(player)
+            end
+            for player, connections in pairs(playerConnections) do
+                for _, conn in pairs(connections) do
+                    conn:Disconnect()
+                end
+            end
+            playerConnections = {}
+            monitorThread = nil
+            print("ESP Inimigos Desativado!")
+        end
+    end
+})
+
+
+
+GUI:CreateToggle({
+    parent = visual,
+    text = "Esp Melhor Brainrot",
+    default = true,
+    callback = function(state)
+        _G.IsBrainrotEspEnabled = state
+
+        local workspace = game:GetService("Workspace")
+        local Players = game:GetService("Players")
+        local localPlayer = Players.LocalPlayer
+
+        -- Funções auxiliares do seu código original
+        local function getMyPlot()
+            local plots = workspace:FindFirstChild("Plots")
+            if not plots then return nil end
+            for _, plot in ipairs(plots:GetChildren()) do
+                local plotSign = plot:FindFirstChild("PlotSign")
+                if plotSign then
+                    local yourBase = plotSign:FindFirstChild("YourBase")
+                    if yourBase and yourBase.Enabled then
+                        return plot
+                    end
+                end
+            end
+            return nil
+        end
+
+        local function parseValue(str)
+            if not str then return 0 end
+            local cleanStr = string.gsub(str, "/s", "")
+            local num, suffix = string.match(cleanStr, "[$]?[%s]*([%d%.]+)[%s]*([MKBT]?)")
+            if not num then return 0 end
+            num = tonumber(num)
+            if not num then return 0 end
+            if suffix == "K" then num = num * 1e3
+            elseif suffix == "M" then num = num * 1e6
+            elseif suffix == "B" then num = num * 1e9
+            elseif suffix == "T" then num = num * 1e12 end
+            return num
+        end
+
+        local function isRaceTrackObject(obj)
+            local parent = obj.Parent
+            while parent do
+                local nameLower = parent.Name:lower()
+                if string.find(nameLower, "race") or string.find(nameLower, "track") or string.find(nameLower, "obstacle") then
+                    return true
+                end
+                parent = parent.Parent
+            end
+            local nameLower = obj.Name:lower()
+            return string.find(nameLower, "brainrot") or string.find(nameLower, "obstacle") or string.find(nameLower, "race") or string.find(nameLower, "track")
+        end
+
+        local function findAnimalInfo(animalModel)
+            local textLabels = {}
+            for _, gui in ipairs(animalModel:GetDescendants()) do
+                if gui:IsA("TextLabel") then
+                    table.insert(textLabels, gui)
+                elseif gui:IsA("BillboardGui") then
+                    for _, child in ipairs(gui:GetChildren()) do
+                        if child:IsA("TextLabel") then
+                            table.insert(textLabels, child)
+                        end
+                    end
+                end
+            end
+
+            local displayName, valuePerSecond
+
+            for _, label in ipairs(textLabels) do
+                if string.find(label.Text, "[%d%.]+[MB]/s") or string.find(label.Text, "[$][%d%.]+[MB]/s") then
+                    valuePerSecond = label
+                    break
+                end
+            end
+            if not valuePerSecond then
+                for _, label in ipairs(textLabels) do
+                    if string.find(label.Text, "/s") then
+                        valuePerSecond = label
+                        break
+                    end
+                end
+            end
+
+            local nomesEspecificosAceitos = {
+                "SABARÁ", "Tracoolucotulu Delapehaburista", "Nucleare Dinosasuro", 
+                "Gacinói", "Muniz", "Coleto", "Colafar", "Colaf", "Ummand",
+                "La Extina", "Exthra Balerina", "Rinne Red", "Ascara", "Mykhlo",
+                "La Extinta Grande", "Tracoducotulu Dela", "Tralaledon",
+                "Dragon Cannelloni", "Tictac Sahur"
+            }
+
+            local textosParaIgnorar = {
+                "Lava", "Galaxy", "Bloodron", "Tictac", "Sahur", "Candy", "Gold",
+                "Secret", "Diamond", "Rainbow", "BloodRot", "Bloodrot", "Brainrot", 
+                "God", "Legendary", "Mythical", "Exclusive", "Normal",
+                "Watermelon", "P1", "Brr", "es", "Teh", "Patipum", "Spook"
+            }
+
+            for _, label in ipairs(textLabels) do
+                local text = label.Text
+                if not text then continue end
+
+                local ehNomeEspecifico = false
+                for _, nomeEspecial in ipairs(nomesEspecificosAceitos) do
+                    if string.lower(text) == string.lower(nomeEspecial) then
+                        displayName = label
+                        ehNomeEspecifico = true
+                        break
+                    end
+                end
+                if ehNomeEspecifico then break end
+
+                local deveIgnorar = false
+                for _, textoIgnorar in ipairs(textosParaIgnorar) do
+                    if string.lower(text) == string.lower(textoIgnorar) then
+                        deveIgnorar = true
+                        break
+                    end
+                end
+
+                if not deveIgnorar and not string.find(text, "/s") and not string.find(text, "[$MKBT]") and not string.match(text, "^%d") and #text > 3 and #text < 25 then
+                    displayName = label
+                    break
+                end
+            end
+
+            if not displayName then
+                for _, label in ipairs(textLabels) do
+                    local text = label.Text
+                    if string.find(text, "/s") and not string.find(text, "[$]") and not string.find(text, "[MB]/s") then
+                        displayName = label
+                        break
+                    end
+                end
+            end
+
+            return displayName, valuePerSecond
+        end
+
+        local function getAnimalSpawnLocations()
+            local locations = {}
+            local myPlot = getMyPlot()
+            
+            for _, plot in ipairs(workspace.Plots:GetChildren()) do
+                if plot ~= myPlot then 
+                    table.insert(locations, plot) 
+                end
+            end
+
+            local possibleWildAreas = {
+                workspace:FindFirstChild("WildAnimals"),
+                workspace:FindFirstChild("Animals"),
+                workspace:FindFirstChild("SpawnedAnimals"),
+                workspace:FindFirstChild("Pets"),
+                workspace:FindFirstChild("PetsFolder")
+            }
+
+            for _, area in ipairs(possibleWildAreas) do
+                if area then table.insert(locations, area) end
+            end
+
+            for _, child in ipairs(workspace:GetChildren()) do
+                if child:IsA("Folder") or child:IsA("Model") then
+                    local nameLower = child.Name:lower()
+                    if string.find(nameLower, "animal") or string.find(nameLower, "pet") or string.find(nameLower, "wild") or string.find(nameLower, "spawn") then
+                        table.insert(locations, child)
+                    end
+                end
+            end
+
+            return locations
+        end
+
+        local function findBestBrainrot_Metodo1()
+            local best = { animalModel = nil, name = "", valueStr = "", valueNum = 0 }
+            local spawnLocations = getAnimalSpawnLocations()
+            local myPlot = getMyPlot()
+
+            for _, location in ipairs(spawnLocations) do
+                if location and location:IsDescendantOf(workspace) then
+                    for _, obj in ipairs(location:GetDescendants()) do
+                        if obj:IsA("Model") and not obj:FindFirstChild("Base") and not isRaceTrackObject(obj) then
+                            local isInMyPlot = false
+                            if myPlot then
+                                local parent = obj.Parent
+                                while parent do
+                                    if parent == myPlot then
+                                        isInMyPlot = true
+                                        break
+                                    end
+                                    parent = parent.Parent
+                                end
+                            end
+                            if not isInMyPlot then
+                                local displayName, generation = findAnimalInfo(obj)
+                                if displayName and generation then
+                                    local valueNum = parseValue(generation.Text)
+                                    local nameText = displayName.Text
+                                    local isPerSecond = string.find(generation.Text, "/s")
+                                    local textosInvalidos = {"Lava", "Galaxy", "Bloodron", "Tictac", "Sahur", "Candy"}
+                                    local ehValido = true
+                                    for _, textoInvalido in ipairs(textosInvalidos) do
+                                        if string.lower(nameText) == string.lower(textoInvalido) then
+                                            ehValido = false
+                                            break
+                                        end
+                                    end
+                                    if isPerSecond and ehValido and valueNum > best.valueNum then
+                                        best.valueNum = valueNum
+                                        best.valueStr = generation.Text
+                                        best.name = displayName.Text
+                                        best.animalModel = obj
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+
+            return best
+        end
+
+        local function findBestBrainrot_Metodo2()
+            local best = { podium = nil, animalModel = nil, name = "", valueStr = "", valueNum = 0 }
+            local myPlot = getMyPlot()
+            
+            for _, plot in ipairs(workspace.Plots:GetChildren()) do
+                if plot ~= myPlot then
+                    local animalPodiums = plot:FindFirstChild("AnimalPodiums")
+                    if animalPodiums then
+                        for _, podium in ipairs(animalPodiums:GetChildren()) do
+                            local attach = podium:FindFirstChild("Base") and podium.Base:FindFirstChild("Spawn") and podium.Base.Spawn:FindFirstChild("Attachment")
+                            if attach and attach:FindFirstChild("AnimalOverhead") then
+                                local overhead = attach.AnimalOverhead
+                                local displayName = overhead:FindFirstChild("DisplayName")
+                                local generation = overhead:FindFirstChild("Generation")
+                                local hasAnimal = false
+                                for _, obj in ipairs(podium:GetChildren()) do
+                                    if (obj:IsA("Model") or obj:IsA("MeshPart") or obj:IsA("Part")) and obj.Name ~= "Base" then
+                                        hasAnimal = true
+                                        break
+                                    end
+                                end
+                                if displayName and generation and displayName:IsA("TextLabel") and generation:IsA("TextLabel") and hasAnimal then
+                                    local valueNum = parseValue(generation.Text)
+                                    if valueNum > best.valueNum then
+                                        best.valueNum = valueNum
+                                        best.valueStr = generation.Text
+                                        best.name = displayName.Text
+                                        best.podium = podium
+                                        for _, obj in ipairs(podium:GetChildren()) do
+                                            if (obj:IsA("Model") or obj:IsA("MeshPart") or obj:IsA("Part")) and obj.Name ~= "Base" then
+                                                best.animalModel = obj
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            return best
+        end
+
+        local function findBestBrainrotCombined()
+            local best1 = findBestBrainrot_Metodo1()
+            local best2 = findBestBrainrot_Metodo2()
+            if best1.valueNum > best2.valueNum then
+                return best1
+            else
+                return best2
+            end
+        end
+
+        -- ESP Functions
+        local function clearESP()
+            if _G.LastBrainrotESP and _G.LastBrainrotESP.Parent then
+                _G.LastBrainrotESP:Destroy()
+                _G.LastBrainrotESP = nil
+            end
+            if _G.LastBrainrotHighlight and _G.LastBrainrotHighlight.Parent then
+                _G.LastBrainrotHighlight:Destroy()
+                _G.LastBrainrotHighlight = nil
+            end
+        end
+
+        local function highlightAnimal(animalModel, isPodium)
+            if _G.LastBrainrotHighlight and _G.LastBrainrotHighlight.Parent then
+                _G.LastBrainrotHighlight:Destroy()
+            end
+            if animalModel then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "AnimalHighlight"
+                if isPodium then
+                    highlight.FillColor = Color3.fromRGB(135, 206, 250)
+                    highlight.FillTransparency = 0.7
+                    highlight.OutlineColor = Color3.fromRGB(0, 191, 255)
+                else
+                    highlight.FillColor = Color3.fromRGB(255, 165, 0)
+                    highlight.FillTransparency = 0.7
+                    highlight.OutlineColor = Color3.fromRGB(255, 69, 0)
+                end
+                highlight.OutlineTransparency = 0
+                highlight.Adornee = animalModel
+                highlight.Parent = animalModel
+                _G.LastBrainrotHighlight = highlight
+            end
+        end
+
+        local function createESP(animalModel, name, value)
+            local rootPart = animalModel:FindFirstChild("HumanoidRootPart") or animalModel:FindFirstChild("Head") or animalModel:FindFirstChild("Torso") or animalModel:FindFirstChildWhichIsA("Part")
+            local adornee = rootPart or animalModel
+
+            local attachment = Instance.new("Attachment")
+            attachment.Name = "ESPAttachment"
+            attachment.Parent = adornee
+
+            local esp = Instance.new("BillboardGui")
+            esp.Name = "BrainrotESP"
+            esp.Size = UDim2.new(0, 400, 0, 120)
+            esp.Adornee = attachment
+            esp.AlwaysOnTop = true
+            esp.MaxDistance = 1000
+            esp.ExtentsOffset = Vector3.new(0, 5, 0)
+            esp.Parent = attachment
+
+            local container = Instance.new("Frame")
+            container.Size = UDim2.new(1, 0, 1, 0)
+            container.BackgroundTransparency = 1
+            container.Parent = esp
+
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+            nameLabel.Position = UDim2.new(0, 0, 0, 0)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.BorderSizePixel = 0
+            nameLabel.TextStrokeTransparency = 0.3
+            nameLabel.TextSize = 32
+            nameLabel.Font = Enum.Font.GothamBold
+            nameLabel.Text = name
+            nameLabel.TextColor3 = Color3.new(1, 1, 0)
+            nameLabel.TextWrapped = true
+            nameLabel.Parent = container
+
+            local valueLabel = Instance.new("TextLabel")
+            valueLabel.Size = UDim2.new(1, 0, 0.5, 0)
+            valueLabel.Position = UDim2.new(0, 0, 0.5, 0)
+            valueLabel.BackgroundTransparency = 1
+            valueLabel.BorderSizePixel = 0
+            valueLabel.TextStrokeTransparency = 0.3
+            valueLabel.TextSize = 28
+            valueLabel.Font = Enum.Font.GothamBold
+            valueLabel.Text = value
+            valueLabel.TextColor3 = Color3.new(0, 1, 0)
+            valueLabel.TextWrapped = true
+            valueLabel.Parent = container
+
+            return esp, attachment
+        end
+
+        local function showBestBrainrotESP()
+            clearESP()
+            local best = findBestBrainrotCombined()
+            if best.name == "" or not best.animalModel then return end
+            local isPodium = (best.podium ~= nil)
+            highlightAnimal(best.animalModel, isPodium)
+            _G.LastBrainrotESP, _G.LastBrainrotAttachment = createESP(best.animalModel, best.name, best.valueStr)
+        end
+
+        -- Liga ou desliga ESP
+        if state then
+            _G.BrainrotEspLoop = task.spawn(function()
+                while _G.IsBrainrotEspEnabled do
+                    pcall(showBestBrainrotESP)
+                    task.wait(3)
+                end
+            end)
+        else
+            if _G.BrainrotEspLoop then
+                task.cancel(_G.BrainrotEspLoop)
+                _G.BrainrotEspLoop = nil
+            end
+            clearESP()
+        end
+    end
+})
+
+
+
+
+GUI:CreateToggle({
+    parent = visual, 
+    text = "Esp Timer Base", 
+    default = true, 
+    callback = function(state)
+        _G.IsEspTimerBaseEnabled = state
+
+        -- Ativar ESP
+        if state then
+            -- Serviços
+            local Players = game:GetService("Players")
+
+            -- Função para criar o Billboard na base
+            local function CreateESP(basePlot)
+                if basePlot:FindFirstChild("BaseTimerESP") then
+                    return basePlot:FindFirstChild("BaseTimerESP"):FindFirstChild("TextLabel"), basePlot:FindFirstChild("BaseTimerESP")
+                end
+
+                local billboard = Instance.new("BillboardGui")
+                billboard.Size = UDim2.new(0, 200, 0, 50)
+                billboard.AlwaysOnTop = true
+                billboard.StudsOffset = Vector3.new(0, 5, 0)
+                billboard.Name = "BaseTimerESP"
+
+                local label = Instance.new("TextLabel", billboard)
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.BackgroundTransparency = 1
+                label.TextColor3 = Color3.fromRGB(255, 255, 255)
+                label.TextStrokeTransparency = 0.2
+                label.Font = Enum.Font.SourceSansBold
+                label.TextScaled = true
+                label.Text = "Carregando..."
+
+                local part = basePlot:FindFirstChildWhichIsA("BasePart")
+                if part then
+                    billboard.Parent = part
+                end
+
+                return label, billboard
+            end
+
+            -- Função para achar RemainingTime da base
+            local function FindRemainingTime(plot)
+                for _, desc in pairs(plot:GetDescendants()) do
+                    if desc:IsA("TextLabel") and desc.Name == "RemainingTime" then
+                        return desc
+                    end
+                end
+            end
+
+            -- Cria ESP para todas as bases
+            _G.BaseEspElements = {}
+            for _, plot in pairs(workspace.Plots:GetChildren()) do
+                local lbl, billboard = CreateESP(plot)
+                _G.BaseEspElements[plot] = {Label = lbl, Billboard = billboard}
+            end
+
+            -- Loop de atualização
+            _G.BaseEspLoop = task.spawn(function()
+                while _G.IsEspTimerBaseEnabled do
+                    task.wait(1)
+                    for plot, uiElements in pairs(_G.BaseEspElements) do
+                        if not plot or not plot.Parent or not uiElements.Label or not uiElements.Label.Parent then continue end
+                        
+                        local uiLabel = uiElements.Label
+                        local timer = FindRemainingTime(plot)
+
+                        if timer and timer.Text ~= "" then
+                            local num = tonumber(timer.Text:match("%d+"))
+                            if num and num > 0 then
+                                uiLabel.Text = timer.Text
+                                if num <= 10 then
+                                    uiLabel.TextColor3 = Color3.fromRGB(255, 0, 0) -- vermelho
+                                else
+                                    uiLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- branco
+                                end
+                            else
+                                uiLabel.Text = "Aberta"
+                                uiLabel.TextColor3 = Color3.fromRGB(0, 255, 0) -- verde
+                            end
+                        else
+                            uiLabel.Text = "Aberta"
+                            uiLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                        end
+                    end
+                end
+            end)
+
+        -- Desativar ESP
+        else
+            if _G.BaseEspElements then
+                for _, uiElements in pairs(_G.BaseEspElements) do
+                    if uiElements.Billboard and uiElements.Billboard.Parent then
+                        uiElements.Billboard:Destroy()
+                    end
+                end
+                _G.BaseEspElements = nil
+            end
+            if _G.BaseEspLoop then
+                task.cancel(_G.BaseEspLoop)
+                _G.BaseEspLoop = nil
+            end
+        end
+    end
+})
+
+
+local outros = GUI:CreateTab("Outros", "shield")
+
+GUI:CreateSection({
+    parent = outros, 
+    text = "Outros"
+})
+
+
+GUI:CreateToggle({
+    parent = outros, 
+    text = "Flutuar",
+    default = true, 
+    callback = function(state)
+        if state then
+            local url = "https://raw.githubusercontent.com/teuzzjheyt/Fly-New-By-tutu/refs/heads/main/Fly%20New"
+            local success, err = pcall(function()
+                loadstring(game:HttpGet(url, true))()
+            end)
+            if not success then
+                warn("Erro ao injetar a script Flutuar:", err)
+            end
+        end
+    end
+})
+
+
+
+GUI:CreateToggle({
+    parent = outros, 
+    text = "Desync",
+    default = true, 
+    callback = function(state)
+        if state then
+            local url = "https://raw.githubusercontent.com/teuzzjheyt/Desync/refs/heads/main/Desync"
+            local success, err = pcall(function()
+                loadstring(game:HttpGet(url, true))()
+            end)
+            if not success then
+                warn("Erro ao injetar a script Desync:", err)
+            end
+        end
+    end
+})
+
+
+
+GUI:CreateToggle({
+    parent = outros, 
+    text = "Travar Players", 
+    default = true,
+    callback = function(state)
+        if state then
+            -- Puxa e executa o código do Pastefy
+            local url = "https://pastefy.app/odNjTXQx/raw?part=fpsdevoucer.lua"
+            local success, err = pcall(function()
+                loadstring(game:HttpGet(url, true))()
+            end)
+            if not success then
+                warn("Erro ao injetar a script:", err)
+            end
+        end
+    end
+})
+
+
+
+GUI:CreateToggle({
+    parent = outros, 
+    text = "3D Floor", 
+    callback = function(state)
+        if state then
+            -- Coloque aqui a URL da sua script
+            local url = "COLOQUE_AQUI_A_URL_DA_SCRIPT"
+            
+            -- Puxa e executa o código da URL
+            local success, err = pcall(function()
+                loadstring(game:HttpGet(url, true))()
+            end)
+            
+            if not success then
+                warn("Erro ao injetar a script 3D Floor:", err)
+            end
+        end
+    end
+})
+
+
+
+local servidor = GUI:CreateTab("Servidor", "cloud")
+
+GUI:CreateSection({
+    parent = servidor, 
+    text = "Servidor"
+})
+
+GUI:CreateToggle({
+    parent = servidor, 
+    text = "Auto Kick", 
+    callback = function()
+       
+    end
+})
+
+
+GUI:CreateToggle({
+    parent = servidor, 
+    text = "Anti AFK", 
+    callback = function()
+       
+    end
+})
+
+
+GUI:CreateToggle({
+    parent = servidor, 
+    text = "Anti Bee",
+    default = true, 
+    callback = function()
+        -- Script para remover efeito amarelo e zoom do BeeLauncher
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+        local Lighting = game:GetService("Lighting")
+        local player = Players.LocalPlayer
+        local camera = workspace.CurrentCamera
+
+        -- Variáveis
+        local effectsRemoved = false
+        local originalFOV = camera.FieldOfView
+        local connections = {}
+
+        -- Função para remover todos os efeitos visuais
+        local function removeAllEffects()
+            if effectsRemoved then return end
+            effectsRemoved = true
+
+            -- Salvar FOV original
+            originalFOV = camera.FieldOfView
+
+            -- 1. Remover efeitos de COR (amarelo)
+            for _, effect in pairs(Lighting:GetChildren()) do
+                if effect:IsA("ColorCorrectionEffect") or 
+                   effect:IsA("BloomEffect") or 
+                   effect:IsA("BlurEffect") then
+                    effect.Enabled = false
+                end
+            end
+
+            -- 2. Conexão para manter FOV e desativar efeitos continuamente
+            local mainConnection
+            mainConnection = RunService.Heartbeat:Connect(function()
+                if not effectsRemoved then 
+                    mainConnection:Disconnect()
+                    return 
+                end
+                
+                -- Manter FOV normal (contra zoom)
+                camera.FieldOfView = originalFOV
+
+                -- Remover desfoque e amarelo continuamente
+                for _, effect in pairs(Lighting:GetChildren()) do
+                    if effect:IsA("BlurEffect") or effect:IsA("ColorCorrectionEffect") then
+                        effect.Enabled = false
+                        if effect:IsA("BlurEffect") then
+                            effect.Size = 0
+                        end
+                    end
+                end
+            end)
+
+            table.insert(connections, mainConnection)
+
+            -- 3. Monitorar novos efeitos adicionados
+            local lightingConnection = Lighting.ChildAdded:Connect(function(child)
+                if effectsRemoved then
+                    if child:IsA("BlurEffect") or 
+                       child:IsA("ColorCorrectionEffect") or 
+                       child:IsA("BloomEffect") then
+                        child.Enabled = false
+                        if child:IsA("BlurEffect") then
+                            child.Size = 0
+                        end
+                    end
+                end
+            end)
+
+            table.insert(connections, lightingConnection)
+
+            -- 4. Remover ScreenGuis de efeito
+            for _, gui in pairs(player.PlayerGui:GetChildren()) do
+                if gui:IsA("ScreenGui") then
+                    local name = string.lower(gui.Name)
+                    if name:find("effect") or name:find("overlay") or name:find("filter") or name:find("blur") then
+                        gui.Enabled = false
+                    end
+                end
+            end
+
+            -- 5. Monitorar novos ScreenGuis
+            local guiConnection = player.PlayerGui.ChildAdded:Connect(function(child)
+                if effectsRemoved and child:IsA("ScreenGui") then
+                    local name = string.lower(child.Name)
+                    if name:find("effect") or name:find("overlay") or name:find("filter") or name:find("blur") then
+                        child.Enabled = false
+                    end
+                end
+            end)
+
+            table.insert(connections, guiConnection)
+        end
+
+        -- Executar a função diretamente ao ativar o toggle
+        removeAllEffects()
+    end
+})
+
+
+
+GUI:CreateToggle({
+    parent = servidor, 
+    text = "Anti Lag", 
+    default = true,
+    callback = function(value)
+        -- Variável de estado
+        local isEnabled = value
+
+        -- Tabela global para armazenar as skins salvas dos jogadores
+        if not _G.savedSkins then
+            _G.savedSkins = {}
+        end
+
+        -- Função que remove acessórios, camisas e calças de um personagem
+        local function removePlayerSkins(player, character)
+            if not _G.savedSkins[player] then
+                _G.savedSkins[player] = {}
+            end
+            _G.savedSkins[player] = {}
+            for _, item in pairs(character:GetChildren()) do
+                if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") then
+                    table.insert(_G.savedSkins[player], item:Clone())
+                    item:Destroy()
+                end
+            end
+        end
+
+        -- Função que restaura os itens salvos para todos os jogadores
+        local function restoreAllSkins()
+            for player, items in pairs(_G.savedSkins) do
+                if player and player.Character then
+                    for _, itemClone in pairs(items) do
+                        if not player.Character:FindFirstChild(itemClone.Name) then
+                            itemClone:Clone().Parent = player.Character
+                        end
+                    end
+                end
+            end
+            _G.savedSkins = {}
+        end
+
+        -- Função para monitorar quando um jogador regenera o personagem
+        local function monitorPlayerRespawn(player)
+            player.CharacterAdded:Connect(function(character)
+                if isEnabled then
+                    character:WaitForChild("Humanoid")
+                    task.wait(1)
+                    removePlayerSkins(player, character)
+                end
+            end)
+        end
+
+        -- Ativar Anti Lag
+        if value then
+            for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+                if player.Character then
+                    removePlayerSkins(player, player.Character)
+                end
+                monitorPlayerRespawn(player)
+            end
+
+            if not _G.antiLagPlayerAddedConnection then
+                _G.antiLagPlayerAddedConnection = game:GetService("Players").PlayerAdded:Connect(function(player)
+                    monitorPlayerRespawn(player)
+                    player.CharacterAdded:Connect(function(character)
+                        if isEnabled then
+                            character:WaitForChild("Humanoid")
+                            task.wait(1)
+                            removePlayerSkins(player, character)
+                        end
+                    end)
+                end)
+            end
+            _G.isAntiLagEnabled = true
+
+        -- Desativar Anti Lag
+        else
+            restoreAllSkins()
+            _G.isAntiLagEnabled = false
+            if _G.antiLagPlayerAddedConnection then
+                _G.antiLagPlayerAddedConnection:Disconnect()
+                _G.antiLagPlayerAddedConnection = nil
+            end
+        end
+    end
+})
+
+
+
+local information = GUI:CreateTab("VIPs", "crown")
+
+
+GUI:CreateSection({
+    parent = information, 
+    text = "VIPs Functions"
+})
+
+
+GUI:CreateToggle({
+    parent = information, 
+    text = "Server Privado", 
+    callback = function(value)
+        if value then
+            -- Bibliotecas e funções internas
+            local md5, hmac, base64 = {}, {}, {}
+
+            do
+                local T = {
+                    0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee,0xf57c0faf,0x4787c62a,0xa8304613,
+                    0xfd469501,0x698098d8,0x8b44f7af,0xffff5bb1,0x895cd7be,0x6b901122,0xfd987193,
+                    0xa679438e,0x49b40821,0xf61e2562,0xc040b340,0x265e5a51,0xe9b6c7aa,0xd62f105d,
+                    0x02441453,0xd8a1e681,0xe7d3fbc8,0x21e1cde6,0xc33707d6,0xf4d50d87,0x455a14ed,
+                    0xa9e3e905,0xfcefa3f8,0x676f02d9,0x8d2a4c8a,0xfffa3942,0x8771f681,0x6d9d6122,
+                    0xfde5380c,0xa4beea44,0x4bdecfa9,0xf6bb4b60,0xbebfbc70,0x289b7ec6,0xeaa127fa,
+                    0xd4ef3085,0x04881d05,0xd9d4d039,0xe6db99e5,0x1fa27cf8,0xc4ac5665,0xf4292244,
+                    0x432aff97,0xab9423a7,0xfc93a039,0x655b59c3,0x8f0ccc92,0xffeff47d,0x85845dd1,
+                    0x6fa87e4f,0xfe2ce6e0,0xa3014314,0x4e0811a1,0xf7537e82,0xbd3af235,0x2ad7d2bb,
+                    0xeb86d391,
+                }
+
+                local function add(a,b)
+                    local lsw = bit32.band(a,0xFFFF)+bit32.band(b,0xFFFF)
+                    local msw = bit32.rshift(a,16)+bit32.rshift(b,16)+bit32.rshift(lsw,16)
+                    return bit32.bor(bit32.lshift(msw,16), bit32.band(lsw,0xFFFF))
+                end
+                local function rol(x,n) return bit32.bor(bit32.lshift(x,n), bit32.rshift(x,32-n)) end
+                local function F(x,y,z) return bit32.bor(bit32.band(x,y), bit32.band(bit32.bnot(x),z)) end
+                local function G(x,y,z) return bit32.bor(bit32.band(x,z), bit32.band(y,bit32.bnot(z))) end
+                local function H(x,y,z) return bit32.bxor(x,bit32.bxor(y,z)) end
+                local function I(x,y,z) return bit32.bxor(y,bit32.bor(x,bit32.bnot(z))) end
+
+                function md5.sum(message)
+                    local a,b,c,d=0x67452301,0xefcdab89,0x98badcfe,0x10325476
+                    local message_len=#message
+                    local padded_message=message.."\128"
+                    while #padded_message%64~=56 do padded_message=padded_message.."\0" end
+                    local len_bytes=""; local len_bits=message_len*8
+                    for i=0,7 do len_bytes=len_bytes..string.char(bit32.band(bit32.rshift(len_bits,i*8),0xFF)) end
+                    padded_message=padded_message..len_bytes
+
+                    for i=1,#padded_message,64 do
+                        local chunk=padded_message:sub(i,i+63)
+                        local X={}
+                        for j=0,15 do
+                            local b1,b2,b3,b4=chunk:byte(j*4+1,j*4+4)
+                            X[j]=bit32.bor(b1,bit32.lshift(b2,8),bit32.lshift(b3,16),bit32.lshift(b4,24))
+                        end
+                        local aa,bb,cc,dd=a,b,c,d
+                        local s={7,12,17,22,5,9,14,20,4,11,16,23,6,10,15,21}
+                        for j=0,63 do
+                            local f,k,shift_index
+                            if j<16 then f=F(b,c,d) k=j shift_index=j%4
+                            elseif j<32 then f=G(b,c,d) k=(1+5*j)%16 shift_index=4+(j%4)
+                            elseif j<48 then f=H(b,c,d) k=(5+3*j)%16 shift_index=8+(j%4)
+                            else f=I(b,c,d) k=(7*j)%16 shift_index=12+(j%4) end
+                            local temp=add(a,f); temp=add(temp,X[k]); temp=add(temp,T[j+1]); temp=rol(temp,s[shift_index+1])
+                            local new_b=add(b,temp); a,b,c,d=d,new_b,b,c
+                        end
+                        a=add(a,aa) b=add(b,bb) c=add(c,cc) d=add(d,dd)
+                    end
+                    local function to_le_hex(n) local s="" for i=0,3 do s=s..string.char(bit32.band(bit32.rshift(n,i*8),0xFF)) end return s end
+                    return to_le_hex(a)..to_le_hex(b)..to_le_hex(c)..to_le_hex(d)
+                end
+            end
+
+            function hmac.new(key,msg,hash_func)
+                if #key>64 then key=hash_func(key) end
+                local o_key_pad,i_key_pad="",""
+                for i=1,64 do
+                    local byte=(i<=#key and string.byte(key,i)) or 0
+                    o_key_pad=o_key_pad..string.char(bit32.bxor(byte,0x5C))
+                    i_key_pad=i_key_pad..string.char(bit32.bxor(byte,0x36))
+                end
+                return hash_func(o_key_pad..hash_func(i_key_pad..msg))
+            end
+
+            do
+                local b="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+                function base64.encode(data)
+                    return ((data:gsub(".",function(x)
+                        local r,b_val="",x:byte()
+                        for i=8,1,-1 do r=r..(b_val%2^i-b_val%2^(i-1)>0 and"1"or"0") end
+                        return r
+                    end).."0000"):gsub("%d%d%d?%d?%d?%d?",function(x)
+                        if #x<6 then return "" end
+                        local c=0; for i=1,6 do c=c+(x:sub(i,i)=="1" and 2^(6-i) or 0) end
+                        return b:sub(c+1,c+1)
+                    end)..({"","==","="})[#data%3+1])
+                end
+            end
+
+            local function GenerateReservedServerCode(placeId)
+                local uuid={} for i=1,16 do uuid[i]=math.random(0,255) end
+                uuid[7]=bit32.bor(bit32.band(uuid[7],0x0F),0x40)
+                uuid[9]=bit32.bor(bit32.band(uuid[9],0x3F),0x80)
+
+                local firstBytes="" for i=1,16 do firstBytes=firstBytes..string.char(uuid[i]) end
+                local placeIdBytes=""; local pIdRec=placeId
+                for _=1,8 do placeIdBytes=placeIdBytes..string.char(pIdRec%256) pIdRec=math.floor(pIdRec/256) end
+                local content=firstBytes..placeIdBytes
+
+                local KEY="e4Yn8ckbCJtw2sv7qmbg"
+                local signature=hmac.new(KEY,content,md5.sum)
+                local accessCodeBytes=signature..content
+                local accessCode=base64.encode(accessCodeBytes):gsub("+","-"):gsub("/","_")
+                local padding=0; accessCode,_=accessCode:gsub("=",function() padding=padding+1 return "" end)
+                accessCode=accessCode..tostring(padding)
+                local gameCode=string.format("%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",table.unpack(uuid))
+                return accessCode,gameCode
+            end
+
+            -- Executar teleporte APENAS quando ativar toggle
+            local accessCode,_ = GenerateReservedServerCode(game.PlaceId)
+            game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(game.PlaceId,"",accessCode)
+        end
+    end
+})
+
+
+
+
+GUI:CreateToggle({
+    parent = information, 
+    text = "Notfy Vip", 
+    
+    callback = function()
+       
+    end
+})
