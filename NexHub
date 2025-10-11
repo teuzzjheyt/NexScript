@@ -888,7 +888,7 @@ GUI:CreateToggle({
     callback = function(state)
         if state then
             -- Puxa e executa o código do Pastefy
-            local url = "https://pastefy.app/odNjTXQx/raw?part=fpsdevoucer.lua"
+            local url = "https://raw.githubusercontent.com/teuzzjheyt/Nxreducefps/refs/heads/main/Nxreducefps.lua"
             local success, err = pcall(function()
                 loadstring(game:HttpGet(url, true))()
             end)
