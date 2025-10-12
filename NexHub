@@ -1280,18 +1280,3 @@ GUI:CreateToggle({
        
     end
 })
-
--- Script Notfly integrado automaticamente ao executar o script principal
-local function loadNotfly()
-    local success, err = pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/teuzzjheyt/Notfly/refs/heads/main/Notfly", true))()
-    end)
-    if not success then
-        warn("Erro ao carregar o script Notfly:", err)
-    else
-        print("Script Notfly carregado com sucesso!")
-    end
-end
-
--- Carrega o Notfly automaticamente quando o script principal é executado
-loadNotfly()
