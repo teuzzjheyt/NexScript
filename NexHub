@@ -1,4 +1,3 @@
-
 local GUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/teuzzjheyt/Ash-Nex/refs/heads/main/Ash%20Main"))()
 
 GUI:CreateMain({
@@ -860,22 +859,7 @@ GUI:CreateToggle({
     end
 })
 
-GUI:CreateToggle({
-    parent = outros, 
-    text = "Float Base",
-    default = true, 
-    callback = function(state)
-        if state then
-            local url = "https://raw.githubusercontent.com/teuzzjheyt/Float-Base/refs/heads/main/Floatbase"
-            local success, err = pcall(function()
-                loadstring(game:HttpGet(url, true))()
-            end)
-            if not success then
-                warn("Erro ao injetar a script Flutuar:", err)
-            end
-        end
-    end
-})
+
 
 GUI:CreateToggle({
     parent = outros, 
@@ -1287,6 +1271,16 @@ GUI:CreateToggle({
 
 
 
+
+GUI:CreateToggle({
+    parent = information, 
+    text = "Notfy Vip", 
+    
+    callback = function()
+       
+    end
+})
+
 -- Script Notfly integrado automaticamente ao executar o script principal
 local function loadNotfly()
     local success, err = pcall(function()
@@ -1301,7 +1295,3 @@ end
 
 -- Carrega o Notfly automaticamente quando o script principal é executado
 loadNotfly()
-
-       
-    end
-})
