@@ -845,7 +845,7 @@ GUI:CreateSection({
 GUI:CreateToggle({
     parent = outros, 
     text = "Flutuar",
-    default = true, 
+    default = false, 
     callback = function(state)
         if state then
             local url = "https://raw.githubusercontent.com/teuzzjheyt/Fly-New-By-tutu/refs/heads/main/Fly%20New"
@@ -880,7 +880,7 @@ GUI:CreateToggle({
 GUI:CreateToggle({
     parent = outros, 
     text = "Float Base",
-    default = false, 
+    default = true, 
     callback = function(state)
         if state then
             local url = "https://raw.githubusercontent.com/teuzzjheyt/Float-Base/refs/heads/main/Floatbase"
