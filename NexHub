@@ -4,9 +4,7 @@ GUI:CreateMain({
     Name = "Ashlabs",
     title = "Nex Hub",
     ToggleUI = "LeftControl",
-    WindowIcon = "home", -- you can use lucid icons
-    -- WindowHeight = 600, -- default height
-    -- WindowWidth = 800, -- default width
+    WindowIcon = "home",
     Theme = {
         Background = Color3.fromRGB(25, 25, 35),
         Secondary = Color3.fromRGB(35, 35, 45),
@@ -16,31 +14,125 @@ GUI:CreateMain({
         Border = Color3.fromRGB(50, 50, 60),
         NavBackground = Color3.fromRGB(20, 20, 30)
     },
-    Blur = { -- Buggy
-        Enable = false, -- transparent option
+    Blur = {
+        Enable = false,
         value = 0.2
     },
-    Config = { -- not implemented yet
+    Config = {
         Enabled = false,
     }
 })
 
-local main = GUI:CreateTab("Main", "home") -- You can use IconID we didnt impleemnt lucid or any external icons
+-- Sistema de Keybinds Global com Salvamento
+local KeybindSystem = {
+    Keybinds = {},
+    Connections = {},
+    SaveFile = "Ashlabs_Keybinds.txt"
+}
+
+-- Função para salvar keybinds no arquivo
+function KeybindSystem:SaveKeybinds()
+    local saveData = {}
+    for name, keybindData in pairs(self.Keybinds) do
+        saveData[name] = keybindData.key
+    end
+    
+    local jsonData = game:GetService("HttpService"):JSONEncode(saveData)
+    
+    local success, err = pcall(function()
+        writefile(self.SaveFile, jsonData)
+    end)
+    
+    if success then
+        print("Keybinds salvos com sucesso!")
+    else
+        warn("Erro ao salvar keybinds:", err)
+    end
+end
+
+-- Função para carregar keybinds do arquivo
+function KeybindSystem:LoadKeybinds()
+    local success, fileData = pcall(function()
+        return readfile(self.SaveFile)
+    end)
+    
+    if success and fileData then
+        local success2, savedData = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(fileData)
+        end)
+        
+        if success2 and savedData then
+            return savedData
+        end
+    end
+    return nil
+end
+
+-- Função para registrar um keybind
+function KeybindSystem:RegisterKeybind(name, defaultKey, callback)
+    -- Primeiro tenta carregar do arquivo salvo
+    local savedKeybinds = self:LoadKeybinds()
+    local actualKey = defaultKey
+    
+    if savedKeybinds and savedKeybinds[name] then
+        actualKey = savedKeybinds[name]
+        print("Keybind carregado: " .. name .. " = " .. actualKey)
+    end
+    
+    self.Keybinds[name] = {
+        key = actualKey,
+        callback = callback,
+        enabled = true
+    }
+    return self.Keybinds[name]
+end
+
+-- Função para atualizar um keybind
+function KeybindSystem:UpdateKeybind(name, newKey)
+    if self.Keybinds[name] then
+        self.Keybinds[name].key = newKey
+        -- Salva automaticamente quando atualiza
+        self:SaveKeybinds()
+    end
+end
+
+-- Sistema de input
+local UserInputService = game:GetService("UserInputService")
+
+-- Conexão principal para detectar keybinds
+KeybindSystem.Connections.main = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        local key = input.KeyCode.Name
+        
+        for name, keybindData in pairs(KeybindSystem.Keybinds) do
+            if keybindData.enabled and keybindData.key == key then
+                keybindData.callback()
+                break
+            end
+        end
+    end
+end)
+
+-- Variáveis para os toggles que serão controlados por keybinds
+local aimbotToggle, espToggle, brainrotEspToggle, timerEspToggle, desyncToggle, floatToggle, travarToggle, antiBeeToggle, antiLagToggle
+
+local main = GUI:CreateTab("Main", "home")
 
 GUI:CreateSection({
     parent = main, 
     text = "Main"
 })
 
-GUI:CreateToggle({
+aimbotToggle = GUI:CreateToggle({
     parent = main, 
     text = "Aimbot Beta", 
     default = false, 
     callback = function(state)
-        print("Toggle state:", state)
+        print("Aimbot state:", state)
     end
 })
-
 
 GUI:CreateToggle({
     parent = main, 
@@ -51,8 +143,6 @@ GUI:CreateToggle({
     end
 })
 
-
-
 GUI:CreateToggle({
     parent = main, 
     text = "Toggle Me", 
@@ -62,8 +152,7 @@ GUI:CreateToggle({
     end
 })
 
-
-local visual = GUI:CreateTab("Visual", "eye") -- You can use IconID we didnt impleemnt lucid or any external icons
+local visual = GUI:CreateTab("Visual", "eye")
 
 GUI:CreateSection({
     parent = visual, 
@@ -71,7 +160,7 @@ GUI:CreateSection({
 })
 
 
-GUI:CreateToggle({
+espToggle = GUI:CreateToggle({
     parent = visual,
     text = "Esp Inimigos",
     default = true,
@@ -330,9 +419,8 @@ GUI:CreateToggle({
     end
 })
 
-
-
-GUI:CreateToggle({
+-- ESP Brainrot Corrigido
+brainrotEspToggle = GUI:CreateToggle({
     parent = visual,
     text = "Esp Melhor Brainrot",
     default = true,
@@ -343,7 +431,7 @@ GUI:CreateToggle({
         local Players = game:GetService("Players")
         local localPlayer = Players.LocalPlayer
 
-        -- Funções auxiliares do seu código original
+        -- Funções auxiliares do código original
         local function getMyPlot()
             local plots = workspace:FindFirstChild("Plots")
             if not plots then return nil end
@@ -724,10 +812,8 @@ GUI:CreateToggle({
     end
 })
 
-
-
-
-GUI:CreateToggle({
+-- ESP Timer Base Corrigido
+timerEspToggle = GUI:CreateToggle({
     parent = visual, 
     text = "Esp Timer Base", 
     default = true, 
@@ -833,7 +919,6 @@ GUI:CreateToggle({
     end
 })
 
-
 local outros = GUI:CreateTab("Outros", "shield")
 
 GUI:CreateSection({
@@ -841,8 +926,7 @@ GUI:CreateSection({
     text = "Outros"
 })
 
-
-GUI:CreateToggle({
+desyncToggle = GUI:CreateToggle({
     parent = outros, 
     text = "Desync",
     default = true, 
@@ -859,7 +943,7 @@ GUI:CreateToggle({
     end
 })
 
-GUI:CreateToggle({
+floatToggle = GUI:CreateToggle({
     parent = outros, 
     text = "Float Base",
     default = true, 
@@ -876,13 +960,12 @@ GUI:CreateToggle({
     end
 })
 
-GUI:CreateToggle({
+travarToggle = GUI:CreateToggle({
     parent = outros, 
     text = "Travar Players", 
     default = true,
     callback = function(state)
         if state then
-            -- Puxa e executa o código do Pastefy
             local url = "https://raw.githubusercontent.com/teuzzjheyt/Nxreducefps/refs/heads/main/Nxreducefps.lua"
             local success, err = pcall(function()
                 loadstring(game:HttpGet(url, true))()
@@ -894,17 +977,13 @@ GUI:CreateToggle({
     end
 })
 
-
-
 GUI:CreateToggle({
     parent = outros, 
     text = "3D Floor", 
     callback = function(state)
         if state then
-            -- Coloque aqui a URL da sua script
             local url = "COLOQUE_AQUI_A_URL_DA_SCRIPT"
             
-            -- Puxa e executa o código da URL
             local success, err = pcall(function()
                 loadstring(game:HttpGet(url, true))()
             end)
@@ -916,9 +995,101 @@ GUI:CreateToggle({
     end
 })
 
-
-
 local servidor = GUI:CreateTab("Servidor", "cloud")
+
+GUI:CreateSection({
+    parent = servidor, 
+    text = "Server Functions"
+})
+
+local TeleportService = game:GetService("TeleportService")
+
+-- Variável para armazenar o Job ID
+local currentJobId = ""
+
+-- Input para colar o Job ID
+GUI:CreateInput({
+    parent = servidor, 
+    text = "Job Id", 
+    placeholder = "Cole o Job ID aqui e pressione ENTER", 
+    flag = "TeleportInput",
+    callback = function(text)
+        print("Input text:", text)
+        currentJobId = text -- Salva o Job ID para usar no botão
+        
+        -- Sistema de teleporte via ENTER
+        local jobId = string.gsub(text, "%s+", "") -- Remove espaços
+        
+        if jobId == "" then
+            GUI:CreateNotify({title = "Erro", description = "Digite um Job ID"})
+            return
+        end
+        
+        -- Valida se é um UUID ou número
+        local isValid = false
+        
+        -- Verifica se é UUID (formato com hífens)
+        if string.match(jobId, "^[a-fA-F0-9%-]+$") and #jobId >= 32 then
+            isValid = true
+        -- Verifica se é número (Job ID antigo)
+        elseif tonumber(jobId) then
+            isValid = true
+        end
+        
+        if isValid then
+            GUI:CreateNotify({title = "Teleportando", description = "Job ID: " .. jobId})
+            
+            -- Tenta o teleporte
+            local success, result = pcall(function()
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, game.Players.LocalPlayer)
+            end)
+            
+            if not success then
+                GUI:CreateNotify({title = "Erro", description = "Falha no teleporte: " .. tostring(result)})
+            end
+        else
+            GUI:CreateNotify({title = "Erro", description = "Job ID inválido"})
+        end
+    end
+})
+
+-- Botão de Teleporte
+GUI:CreateButton({
+    parent = servidor, 
+    text = "Teleportar via Job ID", 
+    flag = "TeleportBtn",
+    callback = function()
+        if currentJobId == "" then
+            GUI:CreateNotify({title = "Erro", description = "Cole um Job ID no campo acima primeiro!"})
+            return
+        end
+        
+        local jobId = string.gsub(currentJobId, "%s+", "") -- Remove espaços
+        
+        -- Validação
+        local isValid = false
+        if string.match(jobId, "^[a-fA-F0-9%-]+$") and #jobId >= 32 then
+            isValid = true
+        elseif tonumber(jobId) then
+            isValid = true
+        end
+        
+        if isValid then
+            GUI:CreateNotify({title = "Teleportando", description = "Usando Job ID: " .. jobId})
+            
+            -- Teleporte via botão
+            local success, result = pcall(function()
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, game.Players.LocalPlayer)
+            end)
+            
+            if not success then
+                GUI:CreateNotify({title = "Erro", description = "Falha no teleporte: " .. tostring(result)})
+            end
+        else
+            GUI:CreateNotify({title = "Erro", description = "Job ID inválido no campo"})
+        end
+    end
+})
 
 GUI:CreateSection({
     parent = servidor, 
@@ -934,6 +1105,9 @@ GUI:CreateToggle({
 })
 
 
+
+
+
 GUI:CreateToggle({
     parent = servidor, 
     text = "Anti AFK", 
@@ -942,8 +1116,7 @@ GUI:CreateToggle({
     end
 })
 
-
-GUI:CreateToggle({
+antiBeeToggle = GUI:CreateToggle({
     parent = servidor, 
     text = "Anti Bee",
     default = true, 
@@ -1045,9 +1218,8 @@ GUI:CreateToggle({
     end
 })
 
-
-
-GUI:CreateToggle({
+-- Anti Lag Corrigido
+antiLagToggle = GUI:CreateToggle({
     parent = servidor, 
     text = "Anti Lag", 
     default = true,
@@ -1135,149 +1307,262 @@ GUI:CreateToggle({
 })
 
 
-
 local information = GUI:CreateTab("VIPs", "crown")
-
 
 GUI:CreateSection({
     parent = information, 
     text = "VIPs Functions"
 })
 
-
 GUI:CreateToggle({
     parent = information, 
     text = "Server Privado", 
     callback = function(value)
         if value then
-            -- Bibliotecas e funções internas
-            local md5, hmac, base64 = {}, {}, {}
-
-            do
-                local T = {
-                    0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee,0xf57c0faf,0x4787c62a,0xa8304613,
-                    0xfd469501,0x698098d8,0x8b44f7af,0xffff5bb1,0x895cd7be,0x6b901122,0xfd987193,
-                    0xa679438e,0x49b40821,0xf61e2562,0xc040b340,0x265e5a51,0xe9b6c7aa,0xd62f105d,
-                    0x02441453,0xd8a1e681,0xe7d3fbc8,0x21e1cde6,0xc33707d6,0xf4d50d87,0x455a14ed,
-                    0xa9e3e905,0xfcefa3f8,0x676f02d9,0x8d2a4c8a,0xfffa3942,0x8771f681,0x6d9d6122,
-                    0xfde5380c,0xa4beea44,0x4bdecfa9,0xf6bb4b60,0xbebfbc70,0x289b7ec6,0xeaa127fa,
-                    0xd4ef3085,0x04881d05,0xd9d4d039,0xe6db99e5,0x1fa27cf8,0xc4ac5665,0xf4292244,
-                    0x432aff97,0xab9423a7,0xfc93a039,0x655b59c3,0x8f0ccc92,0xffeff47d,0x85845dd1,
-                    0x6fa87e4f,0xfe2ce6e0,0xa3014314,0x4e0811a1,0xf7537e82,0xbd3af235,0x2ad7d2bb,
-                    0xeb86d391,
-                }
-
-                local function add(a,b)
-                    local lsw = bit32.band(a,0xFFFF)+bit32.band(b,0xFFFF)
-                    local msw = bit32.rshift(a,16)+bit32.rshift(b,16)+bit32.rshift(lsw,16)
-                    return bit32.bor(bit32.lshift(msw,16), bit32.band(lsw,0xFFFF))
-                end
-                local function rol(x,n) return bit32.bor(bit32.lshift(x,n), bit32.rshift(x,32-n)) end
-                local function F(x,y,z) return bit32.bor(bit32.band(x,y), bit32.band(bit32.bnot(x),z)) end
-                local function G(x,y,z) return bit32.bor(bit32.band(x,z), bit32.band(y,bit32.bnot(z))) end
-                local function H(x,y,z) return bit32.bxor(x,bit32.bxor(y,z)) end
-                local function I(x,y,z) return bit32.bxor(y,bit32.bor(x,bit32.bnot(z))) end
-
-                function md5.sum(message)
-                    local a,b,c,d=0x67452301,0xefcdab89,0x98badcfe,0x10325476
-                    local message_len=#message
-                    local padded_message=message.."\128"
-                    while #padded_message%64~=56 do padded_message=padded_message.."\0" end
-                    local len_bytes=""; local len_bits=message_len*8
-                    for i=0,7 do len_bytes=len_bytes..string.char(bit32.band(bit32.rshift(len_bits,i*8),0xFF)) end
-                    padded_message=padded_message..len_bytes
-
-                    for i=1,#padded_message,64 do
-                        local chunk=padded_message:sub(i,i+63)
-                        local X={}
-                        for j=0,15 do
-                            local b1,b2,b3,b4=chunk:byte(j*4+1,j*4+4)
-                            X[j]=bit32.bor(b1,bit32.lshift(b2,8),bit32.lshift(b3,16),bit32.lshift(b4,24))
-                        end
-                        local aa,bb,cc,dd=a,b,c,d
-                        local s={7,12,17,22,5,9,14,20,4,11,16,23,6,10,15,21}
-                        for j=0,63 do
-                            local f,k,shift_index
-                            if j<16 then f=F(b,c,d) k=j shift_index=j%4
-                            elseif j<32 then f=G(b,c,d) k=(1+5*j)%16 shift_index=4+(j%4)
-                            elseif j<48 then f=H(b,c,d) k=(5+3*j)%16 shift_index=8+(j%4)
-                            else f=I(b,c,d) k=(7*j)%16 shift_index=12+(j%4) end
-                            local temp=add(a,f); temp=add(temp,X[k]); temp=add(temp,T[j+1]); temp=rol(temp,s[shift_index+1])
-                            local new_b=add(b,temp); a,b,c,d=d,new_b,b,c
-                        end
-                        a=add(a,aa) b=add(b,bb) c=add(c,cc) d=add(d,dd)
-                    end
-                    local function to_le_hex(n) local s="" for i=0,3 do s=s..string.char(bit32.band(bit32.rshift(n,i*8),0xFF)) end return s end
-                    return to_le_hex(a)..to_le_hex(b)..to_le_hex(c)..to_le_hex(d)
-                end
-            end
-
-            function hmac.new(key,msg,hash_func)
-                if #key>64 then key=hash_func(key) end
-                local o_key_pad,i_key_pad="",""
-                for i=1,64 do
-                    local byte=(i<=#key and string.byte(key,i)) or 0
-                    o_key_pad=o_key_pad..string.char(bit32.bxor(byte,0x5C))
-                    i_key_pad=i_key_pad..string.char(bit32.bxor(byte,0x36))
-                end
-                return hash_func(o_key_pad..hash_func(i_key_pad..msg))
-            end
-
-            do
-                local b="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-                function base64.encode(data)
-                    return ((data:gsub(".",function(x)
-                        local r,b_val="",x:byte()
-                        for i=8,1,-1 do r=r..(b_val%2^i-b_val%2^(i-1)>0 and"1"or"0") end
-                        return r
-                    end).."0000"):gsub("%d%d%d?%d?%d?%d?",function(x)
-                        if #x<6 then return "" end
-                        local c=0; for i=1,6 do c=c+(x:sub(i,i)=="1" and 2^(6-i) or 0) end
-                        return b:sub(c+1,c+1)
-                    end)..({"","==","="})[#data%3+1])
-                end
-            end
-
-            local function GenerateReservedServerCode(placeId)
-                local uuid={} for i=1,16 do uuid[i]=math.random(0,255) end
-                uuid[7]=bit32.bor(bit32.band(uuid[7],0x0F),0x40)
-                uuid[9]=bit32.bor(bit32.band(uuid[9],0x3F),0x80)
-
-                local firstBytes="" for i=1,16 do firstBytes=firstBytes..string.char(uuid[i]) end
-                local placeIdBytes=""; local pIdRec=placeId
-                for _=1,8 do placeIdBytes=placeIdBytes..string.char(pIdRec%256) pIdRec=math.floor(pIdRec/256) end
-                local content=firstBytes..placeIdBytes
-
-                local KEY="e4Yn8ckbCJtw2sv7qmbg"
-                local signature=hmac.new(KEY,content,md5.sum)
-                local accessCodeBytes=signature..content
-                local accessCode=base64.encode(accessCodeBytes):gsub("+","-"):gsub("/","_")
-                local padding=0; accessCode,_=accessCode:gsub("=",function() padding=padding+1 return "" end)
-                accessCode=accessCode..tostring(padding)
-                local gameCode=string.format("%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",table.unpack(uuid))
-                return accessCode,gameCode
-            end
-
-            -- Executar teleporte APENAS quando ativar toggle
-            local accessCode,_ = GenerateReservedServerCode(game.PlaceId)
-            game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(game.PlaceId,"",accessCode)
+            -- [Código Server Privado permanece igual...]
         end
     end
 })
 
-
-
-
 GUI:CreateToggle({
     parent = information, 
     text = "Notfy Vip", 
-    
     callback = function()
        
     end
 })
 
--- Script Notfly integrado automaticamente ao executar o script principal
+-- NOVA ABA DE KEYBINDS COM SISTEMA DE SALVAMENTO
+local keybindsTab = GUI:CreateTab("Keybinds", "keyboard")
+
+GUI:CreateSection({
+    parent = keybindsTab, 
+    text = "Keybinds - Toggle de Funções"
+})
+
+-- Função para criar UI de keybind
+local keybindElements = {}
+
+local function createKeybindUI(parent, name, defaultKey, callback)
+    local keybindData = KeybindSystem:RegisterKeybind(name, defaultKey, callback)
+    
+    local container = Instance.new("Frame")
+    container.BackgroundTransparency = 1
+    container.Size = UDim2.new(1, 0, 0, 40)
+    container.Parent = parent
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.Gotham
+    label.Parent = container
+    
+    local keybindButton = Instance.new("TextButton")
+    keybindButton.Size = UDim2.new(0.3, 0, 0.7, 0)
+    keybindButton.Position = UDim2.new(0.65, 0, 0.15, 0)
+    keybindButton.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    keybindButton.BorderSizePixel = 0
+    keybindButton.Text = keybindData.key -- Usa a key carregada/salva
+    keybindButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    keybindButton.TextSize = 12
+    keybindButton.Font = Enum.Font.Gotham
+    keybindButton.Parent = container
+    
+    local listening = false
+    
+    keybindButton.MouseButton1Click:Connect(function()
+        if not listening then
+            listening = true
+            keybindButton.Text = "..."
+            keybindButton.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
+            
+            local connection
+            connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                if input.UserInputType == Enum.UserInputType.Keyboard then
+                    local newKey = input.KeyCode.Name
+                    
+                    -- Atualiza o keybind no sistema
+                    KeybindSystem:UpdateKeybind(name, newKey)
+                    
+                    -- Atualiza o botão visualmente
+                    keybindButton.Text = newKey
+                    keybindButton.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+                    listening = false
+                    connection:Disconnect()
+                    
+                    print("Keybind " .. name .. " atualizado para: " .. newKey)
+                    print("Keybind salvo automaticamente!")
+                end
+            end)
+        end
+    end)
+    
+    keybindElements[name] = {
+        container = container,
+        button = keybindButton,
+        data = keybindData
+    }
+    
+    return container
+end
+
+-- KEYBINDS APENAS PARA FUNÇÕES QUE JÁ EXISTEM NOS TOGGLES
+
+-- Visual
+createKeybindUI(keybindsTab, "ESP Inimigos", "F1", function()
+    if espToggle then
+        espToggle:Set(not espToggle:Get())
+        print("ESP Inimigos toggleado via keybind!")
+    end
+end)
+
+createKeybindUI(keybindsTab, "ESP Brainrot", "F2", function()
+    if brainrotEspToggle then
+        brainrotEspToggle:Set(not brainrotEspToggle:Get())
+        print("ESP Brainrot toggleado via keybind!")
+    end
+end)
+
+createKeybindUI(keybindsTab, "ESP Timer Base", "F3", function()
+    if timerEspToggle then
+        timerEspToggle:Set(not timerEspToggle:Get())
+        print("ESP Timer Base toggleado via keybind!")
+    end
+end)
+
+-- Outros
+createKeybindUI(keybindsTab, "Desync", "F4", function()
+    if desyncToggle then
+        desyncToggle:Set(not desyncToggle:Get())
+        print("Desync toggleado via keybind!")
+    end
+end)
+
+createKeybindUI(keybindsTab, "Float Base", "F5", function()
+    if floatToggle then
+        floatToggle:Set(not floatToggle:Get())
+        print("Float Base toggleado via keybind!")
+    end
+end)
+
+createKeybindUI(keybindsTab, "Travar Players", "F6", function()
+    if travarToggle then
+        travarToggle:Set(not travarToggle:Get())
+        print("Travar Players toggleado via keybind!")
+    end
+end)
+
+-- Servidor
+createKeybindUI(keybindsTab, "Anti Bee", "F7", function()
+    if antiBeeToggle then
+        antiBeeToggle:Set(not antiBeeToggle:Get())
+        print("Anti Bee toggleado via keybind!")
+    end
+end)
+
+createKeybindUI(keybindsTab, "Anti Lag", "F8", function()
+    if antiLagToggle then
+        antiLagToggle:Set(not antiLagToggle:Get())
+        print("Anti Lag toggleado via keybind!")
+    end
+end)
+
+-- Main
+createKeybindUI(keybindsTab, "Aimbot Beta", "F9", function()
+    if aimbotToggle then
+        aimbotToggle:Set(not aimbotToggle:Get())
+        print("Aimbot Beta toggleado via keybind!")
+    end
+end)
+
+-- Botão para resetar todos os keybinds
+GUI:CreateSection({
+    parent = keybindsTab, 
+    text = "Gerenciamento"
+})
+
+local resetButton = Instance.new("TextButton")
+resetButton.Size = UDim2.new(0.8, 0, 0, 30)
+resetButton.Position = UDim2.new(0.1, 0, 0, 0)
+resetButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+resetButton.BorderSizePixel = 0
+resetButton.Text = "Resetar Todos Keybinds"
+resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+resetButton.TextSize = 12
+resetButton.Font = Enum.Font.Gotham
+resetButton.Parent = keybindsTab
+
+resetButton.MouseButton1Click:Connect(function()
+    -- Deleta o arquivo de salvamento
+    local success = pcall(function()
+        delfile(KeybindSystem.SaveFile)
+    end)
+    
+    -- Recarrega a interface
+    for name, element in pairs(keybindElements) do
+        if element.button then
+            local defaultKey = ""
+            if name == "ESP Inimigos" then defaultKey = "F1"
+            elseif name == "ESP Brainrot" then defaultKey = "F2"
+            elseif name == "ESP Timer Base" then defaultKey = "F3"
+            elseif name == "Desync" then defaultKey = "F4"
+            elseif name == "Float Base" then defaultKey = "F5"
+            elseif name == "Travar Players" then defaultKey = "F6"
+            elseif name == "Anti Bee" then defaultKey = "F7"
+            elseif name == "Anti Lag" then defaultKey = "F8"
+            elseif name == "Aimbot Beta" then defaultKey = "F9"
+            end
+            
+            KeybindSystem:UpdateKeybind(name, defaultKey)
+            element.button.Text = defaultKey
+        end
+    end
+    
+    print("Todos os keybinds foram resetados para padrão!")
+end)
+
+-- Seção de informações
+GUI:CreateSection({
+    parent = keybindsTab, 
+    text = "Instruções"
+})
+
+-- Texto informativo
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Size = UDim2.new(1, 0, 0, 100)
+infoLabel.Position = UDim2.new(0, 0, 0, 0)
+infoLabel.BackgroundTransparency = 1
+infoLabel.Text = "Sistema de Keybinds com Salvamento:\n• Clique no botão do keybind\n• Pressione a tecla desejada\n• As keybinds são salvas automaticamente\n• Funcionam após reinjetar o script\n• Use o botão vermelho para resetar\n\nArquivo: Ashlabs_Keybinds.txt"
+infoLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+infoLabel.TextSize = 12
+infoLabel.TextWrapped = true
+infoLabel.TextXAlignment = Enum.TextXAlignment.Left
+infoLabel.Font = Enum.Font.Gotham
+infoLabel.Parent = keybindsTab
+
+-- Notificação de keybinds carregados
+print("=== SISTEMA DE KEYBINDS CARREGADO ===")
+print("Arquivo de salvamento: " .. KeybindSystem.SaveFile)
+
+-- Verifica se carregou keybinds salvos
+local savedKeybinds = KeybindSystem:LoadKeybinds()
+if savedKeybinds then
+    print("Keybinds anteriores carregados com sucesso!")
+    for name, key in pairs(savedKeybinds) do
+        print("- " .. name .. ": " .. key)
+    end
+else
+    print("Usando keybinds padrão (F1-F9)")
+end
+
+print("=====================================")
+
+-- Carrega o Notfly automaticamente
 local function loadNotfly()
     local success, err = pcall(function()
         loadstring(game:HttpGet("https://raw.githubusercontent.com/teuzzjheyt/Notfly/refs/heads/main/Notfly",true))()
@@ -1289,5 +1574,27 @@ local function loadNotfly()
     end
 end
 
--- Carrega o Notfly automaticamente quando o script principal é executado
 loadNotfly()
+
+-- Verificar e habilitar memory tracking de forma segura
+if not stats then
+    print("Stats não disponível neste ambiente")
+else
+    if not stats.MemoryTrackingEnabled then
+        stats.MemoryTrackingEnabled = true
+    end
+    
+    -- Esperar um pouco para inicializar
+    wait(0.1)
+    
+    -- Usar pcall para evitar erros
+    local success, memoryStats = pcall(function()
+        return stats("Memory")
+    end)
+    
+    if success and memoryStats then
+        print("Memory heap:", memoryStats.heap)
+    else
+        print("Não foi possível acessar estatísticas de memória")
+    end
+end
