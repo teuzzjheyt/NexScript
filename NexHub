@@ -960,6 +960,80 @@ floatToggle = GUI:CreateToggle({
     end
 })
 
+-- Variáveis globais para o Infinite Jump
+local infiniteJumpEnabled = false
+local renderSteppedConnection = nil
+local characterAddedConnection = nil
+
+infiniteJumpToggle = GUI:CreateToggle({
+    parent = outros, 
+    text = "Infinite Jump",
+    default = false, 
+    callback = function(state)
+        local LocalPlayer = game:GetService("Players").LocalPlayer
+        local UserInputService = game:GetService("UserInputService")
+        local RunService = game:GetService("RunService")
+        
+        if state then
+            -- Ativar Infinite Jump
+            infiniteJumpEnabled = true
+            
+            local function enableInfiniteJump()
+                if renderSteppedConnection then
+                    renderSteppedConnection:Disconnect()
+                    renderSteppedConnection = nil
+                end
+
+                renderSteppedConnection = RunService.RenderStepped:Connect(function()
+                    local character = LocalPlayer.Character
+                    if not character then return end
+                    
+                    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                    local humanoid = character:FindFirstChildOfClass("Humanoid")
+                    
+                    if humanoidRootPart and humanoid and infiniteJumpEnabled then
+                        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                            humanoidRootPart.Velocity = Vector3.new(
+                                humanoidRootPart.Velocity.X,
+                                40, -- Força do pulo
+                                humanoidRootPart.Velocity.Z
+                            )
+                        end
+                    end
+                end)
+            end
+
+            -- Configurar reconexão quando o personagem morrer/renascer
+            if characterAddedConnection then
+                characterAddedConnection:Disconnect()
+            end
+            
+            characterAddedConnection = LocalPlayer.CharacterAdded:Connect(function(character)
+                if infiniteJumpEnabled then
+                    wait(1)
+                    enableInfiniteJump()
+                end
+            end)
+
+            -- Ativar inicialmente
+            enableInfiniteJump()
+
+        else
+            -- Desativar Infinite Jump
+            infiniteJumpEnabled = false
+            
+            if renderSteppedConnection then
+                renderSteppedConnection:Disconnect()
+                renderSteppedConnection = nil
+            end
+            
+            if characterAddedConnection then
+                characterAddedConnection:Disconnect()
+                characterAddedConnection = nil
+            end
+        end
+    end
+})
 travarToggle = GUI:CreateToggle({
     parent = outros, 
     text = "Travar Players", 
@@ -1440,6 +1514,13 @@ createKeybindUI(keybindsTab, "Desync", "F4", function()
     if desyncToggle then
         desyncToggle:Set(not desyncToggle:Get())
         print("Desync toggleado via keybind!")
+    end
+end)
+
+createKeybindUI(keybindsTab, "InfinfiniteJump", "F4", function()
+    if infiniteJumpToggle then
+        infiniteJumpToggle:Set(not infiniteJumpToggle:Get())
+        print("infiniteJump toggleado via keybind!")
     end
 end)
 
