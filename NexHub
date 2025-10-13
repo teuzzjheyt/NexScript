@@ -1069,6 +1069,129 @@ GUI:CreateToggle({
     end
 })
 
+-- Variáveis globais para manter o estado
+local spammerVariables = {
+    visiblePrompts = {},
+    isSpammerActive = false,
+    spammerLoop = nil,
+    connections = {}
+}
+
+-- Toggle para o Proximity Prompt Spammer
+GUI:CreateToggle({
+    parent = outros,
+    text = "Auto Pull",
+    callback = function(state)
+        local Players = game:GetService('Players')
+        
+        local function addVisiblePrompt(prompt)
+            if prompt and prompt:IsA('ProximityPrompt') then
+                if not table.find(spammerVariables.visiblePrompts, prompt) then
+                    table.insert(spammerVariables.visiblePrompts, prompt)
+                end
+            end
+        end
+
+        local function removeVisiblePrompt(prompt)
+            for i, p in ipairs(spammerVariables.visiblePrompts) do
+                if p == prompt then
+                    table.remove(spammerVariables.visiblePrompts, i)
+                    break
+                end
+            end
+        end
+
+        local function setupPromptEvents()
+            -- Limpar conexões anteriores
+            for _, connection in ipairs(spammerVariables.connections) do
+                connection:Disconnect()
+            end
+            table.clear(spammerVariables.connections)
+            
+            -- Configurar eventos para prompts existentes
+            for _, prompt in pairs(game:GetDescendants()) do
+                if prompt:IsA('ProximityPrompt') then
+                    local conn1 = prompt.PromptShown:Connect(function()
+                        addVisiblePrompt(prompt)
+                    end)
+                    local conn2 = prompt.PromptHidden:Connect(function()
+                        removeVisiblePrompt(prompt)
+                    end)
+                    table.insert(spammerVariables.connections, conn1)
+                    table.insert(spammerVariables.connections, conn2)
+                end
+            end
+
+            -- Configurar evento para novos prompts
+            local descendantAddedConn = game.DescendantAdded:Connect(function(descendant)
+                if descendant:IsA('ProximityPrompt') then
+                    local conn1 = descendant.PromptShown:Connect(function()
+                        addVisiblePrompt(descendant)
+                    end)
+                    local conn2 = descendant.PromptHidden:Connect(function()
+                        removeVisiblePrompt(descendant)
+                    end)
+                    table.insert(spammerVariables.connections, conn1)
+                    table.insert(spammerVariables.connections, conn2)
+                end
+            end)
+            table.insert(spammerVariables.connections, descendantAddedConn)
+        end
+
+        local function triggerWithHold(prompt, holdTime)
+            holdTime = holdTime or 0.5
+            fireproximityprompt(prompt)
+            prompt:InputHoldBegin()
+            wait(holdTime)
+            prompt:InputHoldEnd()
+        end
+
+        local function startSpammer(interval)
+            interval = interval or 1
+            spammerVariables.spammerLoop = task.spawn(function()
+                while spammerVariables.isSpammerActive do
+                    for _, prompt in ipairs(spammerVariables.visiblePrompts) do
+                        if prompt and prompt.Parent and spammerVariables.isSpammerActive then
+                            triggerWithHold(prompt, 0.5)
+                        end
+                    end
+                    task.wait(interval)
+                end
+            end)
+        end
+
+        local function stopSpammer()
+            spammerVariables.isSpammerActive = false
+            if spammerVariables.spammerLoop then
+                task.cancel(spammerVariables.spammerLoop)
+                spammerVariables.spammerLoop = nil
+            end
+            
+            -- Limpar todas as conexões
+            for _, connection in ipairs(spammerVariables.connections) do
+                connection:Disconnect()
+            end
+            table.clear(spammerVariables.connections)
+            
+            -- Limpar a lista de prompts visíveis
+            table.clear(spammerVariables.visiblePrompts)
+        end
+
+        -- Executar baseado no estado do toggle
+        if state then
+            -- Ligar o spammer
+            spammerVariables.isSpammerActive = true
+            setupPromptEvents()
+            startSpammer(1)
+           
+        else
+            -- Desligar o spammer
+            stopSpammer()
+            
+        end
+    end
+})
+
 local servidor = GUI:CreateTab("Servidor", "cloud")
 
 GUI:CreateSection({
@@ -1528,6 +1651,13 @@ createKeybindUI(keybindsTab, "Float Base", "F5", function()
     if floatToggle then
         floatToggle:Set(not floatToggle:Get())
         print("Float Base toggleado via keybind!")
+    end
+end)
+
+createKeybindUI(keybindsTab, "Auto Pull", "F5", function()
+    if floatToggle then
+        floatToggle:Set(not AutoPullToggle:Get())
+        print("Auto Pull toggleado via keybind!")
     end
 end)
 
