@@ -1416,7 +1416,7 @@ antiBeeToggle = GUI:CreateToggle({
     end
 })
 
--- Anti Lag Corrigido
+-- Anti Lag Atualizado
 antiLagToggle = GUI:CreateToggle({
     parent = servidor, 
     text = "Anti Lag", 
@@ -1425,85 +1425,148 @@ antiLagToggle = GUI:CreateToggle({
         -- Variável de estado
         local isEnabled = value
 
-        -- Tabela global para armazenar as skins salvas dos jogadores
-        if not _G.savedSkins then
-            _G.savedSkins = {}
-        end
-
-        -- Função que remove acessórios, camisas e calças de um personagem
-        local function removePlayerSkins(player, character)
-            if not _G.savedSkins[player] then
-                _G.savedSkins[player] = {}
-            end
-            _G.savedSkins[player] = {}
-            for _, item in pairs(character:GetChildren()) do
-                if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") then
-                    table.insert(_G.savedSkins[player], item:Clone())
-                    item:Destroy()
-                end
-            end
-        end
-
-        -- Função que restaura os itens salvos para todos os jogadores
-        local function restoreAllSkins()
-            for player, items in pairs(_G.savedSkins) do
-                if player and player.Character then
-                    for _, itemClone in pairs(items) do
-                        if not player.Character:FindFirstChild(itemClone.Name) then
-                            itemClone:Clone().Parent = player.Character
-                        end
+        -- Função para remover skins de um personagem
+        local function removeSkinsFromCharacter(character)
+            pcall(function()
+                -- Remover roupas e acessórios
+                for _, item in ipairs(character:GetChildren()) do
+                    if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") then
+                        item:Destroy()
                     end
                 end
-            end
-            _G.savedSkins = {}
-        end
-
-        -- Função para monitorar quando um jogador regenera o personagem
-        local function monitorPlayerRespawn(player)
-            player.CharacterAdded:Connect(function(character)
-                if isEnabled then
-                    character:WaitForChild("Humanoid")
-                    task.wait(1)
-                    removePlayerSkins(player, character)
+                
+                -- Remover texturas do corpo
+                local humanoid = character:FindFirstChild("Humanoid")
+                if humanoid then
+                    -- Remover bodies
+                    for _, bodyPart in ipairs(character:GetChildren()) do
+                        if bodyPart:IsA("BasePart") then
+                            -- Remover texturas e materiais
+                            bodyPart.Material = Enum.Material.SmoothPlastic
+                            bodyPart.BrickColor = BrickColor.new("Medium stone grey")
+                            
+                            -- Remover decal (skin)
+                            for _, decal in ipairs(bodyPart:GetChildren()) do
+                                if decal:IsA("Decal") then
+                                    decal:Destroy()
+                                end
+                            end
+                        end
+                    end
+                    
+                    -- Remover head mesh (cabelo, etc)
+                    local head = character:FindFirstChild("Head")
+                    if head then
+                        for _, item in ipairs(head:GetChildren()) do
+                            if item:IsA("SpecialMesh") or item:IsA("MeshPart") then
+                                item:Destroy()
+                            end
+                        end
+                    end
                 end
             end)
         end
 
+        -- Loop principal de remoção de skins
+        local function startSkinRemoval()
+            if _G.skinRemovalLoop then 
+                _G.skinRemovalLoop:Disconnect()
+            end
+            
+            
+            -- Remover skin do próprio player primeiro
+            if game.Players.LocalPlayer.Character then
+                removeSkinsFromCharacter(game.Players.LocalPlayer.Character)
+            end
+            
+            -- Remover skins de todos os outros players
+            for _, otherPlayer in ipairs(game.Players:GetPlayers()) do
+                if otherPlayer.Character then
+                    removeSkinsFromCharacter(otherPlayer.Character)
+                end
+            end
+            
+            -- Monitorar continuamente
+            _G.skinRemovalLoop = game:GetService("RunService").Heartbeat:Connect(function()
+                -- Verificar todos os players no workspace
+                for _, otherPlayer in ipairs(game.Players:GetPlayers()) do
+                    if otherPlayer.Character and otherPlayer.Character:FindFirstChild("Humanoid") then
+                        removeSkinsFromCharacter(otherPlayer.Character)
+                    end
+                end
+                
+                -- Verificar modelos que podem ser clones
+                for _, model in ipairs(workspace:GetChildren()) do
+                    if model:IsA("Model") and model:FindFirstChild("Humanoid") then
+                        -- Verificar se é um clone (tem humanoid mas não é de um player)
+                        local isPlayerCharacter = false
+                        for _, otherPlayer in ipairs(game.Players:GetPlayers()) do
+                            if otherPlayer.Character == model then
+                                isPlayerCharacter = true
+                                break
+                            end
+                        end
+                        
+                        if not isPlayerCharacter then
+                            removeSkinsFromCharacter(model)
+                        end
+                    end
+                end
+            end)
+        end
+
+        -- Função para parar a remoção de skins
+        local function stopSkinRemoval()
+            if _G.skinRemovalLoop then
+                _G.skinRemovalLoop:Disconnect()
+                _G.skinRemovalLoop = nil
+            end
+            
+            if _G.playerAddedConnection then
+                _G.playerAddedConnection:Disconnect()
+                _G.playerAddedConnection = nil
+            end
+            
+            if _G.characterAddedConnection then
+                _G.characterAddedConnection:Disconnect()
+                _G.characterAddedConnection = nil
+            end
+        end
+
         -- Ativar Anti Lag
         if value then
-            for _, player in pairs(game:GetService("Players"):GetPlayers()) do
-                if player.Character then
-                    removePlayerSkins(player, player.Character)
+            -- Monitorar quando novos players entram
+            _G.playerAddedConnection = game.Players.PlayerAdded:Connect(function(otherPlayer)
+                _G.characterAddedConnection = otherPlayer.CharacterAdded:Connect(function(character)
+                    task.wait(1)
+                    removeSkinsFromCharacter(character)
+                end)
+            end)
+
+            -- Aplicar remoção de skins em players existentes
+            for _, otherPlayer in ipairs(game.Players:GetPlayers()) do
+                if otherPlayer.Character then
+                    removeSkinsFromCharacter(otherPlayer.Character)
                 end
-                monitorPlayerRespawn(player)
             end
 
-            if not _G.antiLagPlayerAddedConnection then
-                _G.antiLagPlayerAddedConnection = game:GetService("Players").PlayerAdded:Connect(function(player)
-                    monitorPlayerRespawn(player)
-                    player.CharacterAdded:Connect(function(character)
-                        if isEnabled then
-                            character:WaitForChild("Humanoid")
-                            task.wait(1)
-                            removePlayerSkins(player, character)
-                        end
-                    end)
-                end)
-            end
-            _G.isAntiLagEnabled = true
+            -- Reconectar quando o personagem do player morrer
+            _G.localPlayerConnection = game.Players.LocalPlayer.CharacterAdded:Connect(function(character)
+                task.wait(2)
+                removeSkinsFromCharacter(character)
+            end)
+
+            -- Iniciar automaticamente
+            startSkinRemoval()
+
+
 
         -- Desativar Anti Lag
         else
-            restoreAllSkins()
-            _G.isAntiLagEnabled = false
-            if _G.antiLagPlayerAddedConnection then
-                _G.antiLagPlayerAddedConnection:Disconnect()
-                _G.antiLagPlayerAddedConnection = nil
-            end
+            stopSkinRemoval()
         end
     end
 })
-
 
 local information = GUI:CreateTab("VIPs", "crown")
 
