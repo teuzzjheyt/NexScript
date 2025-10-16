@@ -128,9 +128,198 @@ GUI:CreateSection({
 aimbotToggle = GUI:CreateToggle({
     parent = main, 
     text = "Aimbot Beta", 
+    desc = "Auto Aimbot Cape laser e teia .",
     default = false, 
     callback = function(state)
         print("Aimbot state:", state)
+        
+        -- Implementação do sistema Auto Tool
+        local player = game:GetService("Players").LocalPlayer
+        local replicated_storage = game:GetService("ReplicatedStorage")
+        local players = game:GetService("Players")
+        local run_service = game:GetService("RunService")
+        local user_input_service = game:GetService("UserInputService")
+
+        -- Variáveis globais
+        local auto_enabled = state
+        local auto_connection = nil
+        local current_tool_equipped = nil
+        local current_auto_type = nil
+
+        -- Configurações para cada tipo de ferramenta
+        local tool_configs = {
+            web_slinger = {
+                tool_name = "Web Slinger",
+                remote_names = {
+                    "RE/UseItem",
+                    "UseItem", 
+                    "UseTool"
+                },
+                max_distance = 100
+            },
+            laser_cape = {
+                tool_name = "Laser Cape", 
+                remote_names = {
+                    "RE/UseItem",
+                    "UseItem",
+                    "UseTool"
+                },
+                max_distance = 50
+            }
+        }
+
+        -- Função para detectar qual ferramenta está equipada
+        local function detect_current_tool()
+            local char = player.Character
+            if not char then return nil end
+            
+            local current_tool = char:FindFirstChildOfClass('Tool')
+            if not current_tool then return nil end
+            
+            for tool_type, config in pairs(tool_configs) do
+                if current_tool.Name == config.tool_name then
+                    return tool_type, current_tool
+                end
+            end
+            
+            return nil, current_tool
+        end
+
+        -- Função para encontrar o remote correto
+        local function find_remote(tool_type)
+            local config = tool_configs[tool_type]
+            if not config then return nil end
+            
+            for _, remote_name in ipairs(config.remote_names) do
+                local remote = replicated_storage:FindFirstChild('Packages') and replicated_storage.Packages:FindFirstChild('Net') and replicated_storage.Packages.Net:FindFirstChild(remote_name)
+                if not remote then
+                    remote = replicated_storage:FindFirstChild('Events') and replicated_storage.Events:FindFirstChild(remote_name)
+                end
+                if not remote then
+                    remote = replicated_storage:FindFirstChild('Remotes') and replicated_storage.Remotes:FindFirstChild(remote_name)
+                end
+                if remote then
+                    return remote
+                end
+            end
+            
+            return nil
+        end
+
+        -- Função de atirar/usar ferramenta
+        local function use_tool()
+            if not current_auto_type then return end
+            
+            local char = player.Character
+            local hum = char and char:FindFirstChildOfClass('Humanoid')
+            local remote = find_remote(current_auto_type)
+
+            if not (hum and hum.Health > 0 and remote and current_tool_equipped) then
+                return
+            end
+
+            local my_hrp = char:FindFirstChild('HumanoidRootPart')
+            if my_hrp then
+                local config = tool_configs[current_auto_type]
+                local max_distance = config.max_distance
+                local closest_dist, target_part = max_distance, nil
+                
+                for _, p in ipairs(players:GetPlayers()) do
+                    if p ~= player and p.Character then
+                        local target_hum = p.Character:FindFirstChildOfClass('Humanoid')
+                        local target_torso = p.Character:FindFirstChild('UpperTorso') or p.Character:FindFirstChild('Torso')
+                        local target_hrp = p.Character:FindFirstChild('HumanoidRootPart')
+                        local target_head = p.Character:FindFirstChild('Head')
+                        
+                        if target_hum and target_hum.Health > 0 and target_hrp then
+                            local dist = (my_hrp.Position - target_hrp.Position).Magnitude
+                            if dist < closest_dist then
+                                closest_dist = dist
+                                target_part = target_torso or target_hrp or target_head
+                            end
+                        end
+                    end
+                end
+                
+                if target_part then
+                    remote:FireServer(target_part.Position, target_part)
+                end
+            end
+        end
+
+        -- Função principal do auto tool
+        local function do_auto_tool_cycle()
+            if not auto_enabled then return end
+            
+            if not current_auto_type then
+                local detected_type, tool = detect_current_tool()
+                if detected_type then
+                    current_auto_type = detected_type
+                    current_tool_equipped = tool
+                else
+                    return
+                end
+            end
+            
+            use_tool()
+        end
+
+        -- Função para iniciar o auto tool
+        local function start_auto_tool()
+            if not current_auto_type then
+                local detected_type, tool = detect_current_tool()
+                if detected_type then
+                    current_auto_type = detected_type
+                    current_tool_equipped = tool
+                else
+                    auto_enabled = false
+                    return
+                end
+            end
+            
+            auto_connection = run_service.Heartbeat:Connect(function()
+                do_auto_tool_cycle()
+            end)
+        end
+
+        -- Função para parar o auto tool
+        local function stop_auto_tool()
+            if auto_connection then
+                auto_connection:Disconnect()
+                auto_connection = nil
+            end
+        end
+
+        -- Controlar baseado no estado do toggle
+        if state then
+            start_auto_tool()
+            print("🟢 Auto Tool LIGADO - Equipe Web Slinger ou Laser Cape")
+        else
+            stop_auto_tool()
+            print("🔴 Auto Tool DESLIGADO")
+        end
+
+        -- Monitorar mudanças de ferramenta (apenas se estiver ligado)
+        if state then
+            run_service.Heartbeat:Connect(function()
+                local detected_type, tool = detect_current_tool()
+                
+                if detected_type then
+                    if current_auto_type ~= detected_type then
+                        current_auto_type = detected_type
+                        current_tool_equipped = tool
+                    end
+                else
+                    if current_auto_type then
+                        auto_enabled = false
+                        stop_auto_tool()
+                        current_auto_type = nil
+                        current_tool_equipped = nil
+                        print("🔴 Ferramenta não suportada - Auto Tool desligado")
+                    end
+                end
+            end)
+        end
     end
 })
 
