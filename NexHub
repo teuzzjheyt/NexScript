@@ -6,17 +6,17 @@ GUI:CreateMain({
     ToggleUI = "LeftControl",
     WindowIcon = "home",
     Theme = {
-        Background = Color3.fromRGB(25, 25, 35),
-        Secondary = Color3.fromRGB(35, 35, 45),
-        Accent = Color3.fromRGB(138, 43, 226),
-        Text = Color3.fromRGB(255, 255, 255),
-        TextSecondary = Color3.fromRGB(180, 180, 180),
-        Border = Color3.fromRGB(50, 50, 60),
-        NavBackground = Color3.fromRGB(20, 20, 30)
-    },
+    Background = Color3.fromRGB(10, 10, 10),       -- Preto quase puro
+    Secondary = Color3.fromRGB(20, 20, 20),        -- Preto escuro
+    Accent = Color3.fromRGB(255, 40, 40),          -- Vermelho intenso
+    Text = Color3.fromRGB(255, 255, 255),          -- Texto branco
+    TextSecondary = Color3.fromRGB(180, 180, 180), -- Texto cinza
+    Border = Color3.fromRGB(50, 50, 50),           -- Bordas cinza
+    NavBackground = Color3.fromRGB(5, 5, 5)        -- Preto mais escuro para navegação
+     },
     Blur = {
-        Enable = false,
-        value = 0.2
+        Enable = false,        -- Ativa o blur no fundo
+        value = 0.3           -- Intensidade do blur
     },
     Config = {
         Enabled = false,
@@ -316,6 +316,12 @@ run_service.Heartbeat:Connect(function()
         end
     end
 end)
+
+GUI:CreateParagraph({
+    parent = main,
+    title = "Aimbot Beta",
+    text = "Auto Aim with Laser Cape or single web."
+})
 
 GUI:CreateToggle({
     parent = main, 
@@ -1117,7 +1123,17 @@ desyncToggle = GUI:CreateToggle({
         if state then
             local url = "https://raw.githubusercontent.com/teuzzjheyt/Desync/refs/heads/main/Desync"
             local success, err = pcall(function()
-                loadstring(game:HttpGet(url, true))()
+                local scriptContent = game:HttpGet(url, true)
+                loadstring(scriptContent)()
+                
+                -- Aguarda um pouco e tenta forçar a interface
+                wait(2)
+                -- Tenta encontrar e ativar a interface do Desync
+                pcall(function()
+                    if DesyncMain then
+                        DesyncMain.Visible = true
+                    end
+                end)
             end)
             if not success then
                 warn("Erro ao injetar a script Desync:", err)
