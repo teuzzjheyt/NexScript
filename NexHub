@@ -127,8 +127,7 @@ GUI:CreateSection({
 
 aimbotToggle = GUI:CreateToggle({
     parent = main, 
-    text = "Aimbot Beta", 
-    desc = "Auto Aimbot Cape laser e teia .",
+    text = "Aimbot Beta",
     default = false, 
     callback = function(state)
         print("Aimbot state:", state)
