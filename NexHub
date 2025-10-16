@@ -125,7 +125,215 @@ GUI:CreateSection({
     text = "Main"
 })
 
+-- Variáveis globais fora do toggle
+local auto_enabled = false
+local auto_connection = nil
+local current_tool_equipped = nil
+local current_auto_type = nil
+
+-- Configurações para cada tipo de ferramenta
+local tool_configs = {
+    web_slinger = {
+        tool_name = "Web Slinger",
+        remote_names = {
+            "RE/UseItem",
+            "UseItem", 
+            "UseTool"
+        },
+        max_distance = 100
+    },
+    laser_cape = {
+        tool_name = "Laser Cape", 
+        remote_names = {
+            "RE/UseItem",
+            "UseItem",
+            "UseTool"
+        },
+        max_distance = 50
+    }
+}
+
+aimbotToggle = GUI:CreateToggle({
+    parent = main, 
+    text = "Aimbot Beta", 
+    desc = "Sistema automático para Web Slinger e Laser Cape. Detecta inimigos e atira automaticamente.", 
+    default = false, 
+    callback = function(state)
+        print("Aimbot state:", state)
         
+        local player = game:GetService("Players").LocalPlayer
+        local replicated_storage = game:GetService("ReplicatedStorage")
+        local players = game:GetService("Players")
+        local run_service = game:GetService("RunService")
+
+        -- Função para detectar qual ferramenta está equipada
+        local function detect_current_tool()
+            local char = player.Character
+            if not char then return nil end
+            
+            local current_tool = char:FindFirstChildOfClass('Tool')
+            if not current_tool then return nil end
+            
+            for tool_type, config in pairs(tool_configs) do
+                if current_tool.Name == config.tool_name then
+                    return tool_type, current_tool
+                end
+            end
+            
+            return nil, current_tool
+        end
+
+        -- Função para encontrar o remote correto
+        local function find_remote(tool_type)
+            local config = tool_configs[tool_type]
+            if not config then return nil end
+            
+            for _, remote_name in ipairs(config.remote_names) do
+                local remote = replicated_storage:FindFirstChild('Packages') and replicated_storage.Packages:FindFirstChild('Net') and replicated_storage.Packages.Net:FindFirstChild(remote_name)
+                if not remote then
+                    remote = replicated_storage:FindFirstChild('Events') and replicated_storage.Events:FindFirstChild(remote_name)
+                end
+                if not remote then
+                    remote = replicated_storage:FindFirstChild('Remotes') and replicated_storage.Remotes:FindFirstChild(remote_name)
+                end
+                if remote then
+                    return remote
+                end
+            end
+            
+            return nil
+        end
+
+        -- Função de atirar/usar ferramenta
+        local function use_tool()
+            if not current_auto_type then return end
+            
+            local char = player.Character
+            local hum = char and char:FindFirstChildOfClass('Humanoid')
+            local remote = find_remote(current_auto_type)
+
+            if not (hum and hum.Health > 0 and remote and current_tool_equipped) then
+                return
+            end
+
+            local my_hrp = char:FindFirstChild('HumanoidRootPart')
+            if my_hrp then
+                local config = tool_configs[current_auto_type]
+                local max_distance = config.max_distance
+                local closest_dist, target_part = max_distance, nil
+                
+                for _, p in ipairs(players:GetPlayers()) do
+                    if p ~= player and p.Character then
+                        local target_hum = p.Character:FindFirstChildOfClass('Humanoid')
+                        local target_torso = p.Character:FindFirstChild('UpperTorso') or p.Character:FindFirstChild('Torso')
+                        local target_hrp = p.Character:FindFirstChild('HumanoidRootPart')
+                        local target_head = p.Character:FindFirstChild('Head')
+                        
+                        if target_hum and target_hum.Health > 0 and target_hrp then
+                            local dist = (my_hrp.Position - target_hrp.Position).Magnitude
+                            if dist < closest_dist then
+                                closest_dist = dist
+                                target_part = target_torso or target_hrp or target_head
+                            end
+                        end
+                    end
+                end
+                
+                if target_part then
+                    remote:FireServer(target_part.Position, target_part)
+                end
+            end
+        end
+
+        -- Função principal do auto tool
+        local function do_auto_tool_cycle()
+            if not auto_enabled then return end
+            
+            if not current_auto_type then
+                local detected_type, tool = detect_current_tool()
+                if detected_type then
+                    current_auto_type = detected_type
+                    current_tool_equipped = tool
+                else
+                    return
+                end
+            end
+            
+            use_tool()
+        end
+
+        -- Controlar baseado no estado do toggle
+        auto_enabled = state
+        
+        if state then
+            -- Ligar
+            if auto_connection then
+                auto_connection:Disconnect()
+            end
+            
+            -- Detectar ferramenta atual
+            local detected_type, tool = detect_current_tool()
+            if detected_type then
+                current_auto_type = detected_type
+                current_tool_equipped = tool
+                print("🟢 Auto Tool LIGADO - " .. tool_configs[detected_type].tool_name)
+            else
+                print("⚠️ Auto Tool LIGADO - Equipe Web Slinger ou Laser Cape")
+            end
+            
+            auto_connection = run_service.Heartbeat:Connect(do_auto_tool_cycle)
+        else
+            -- Desligar
+            if auto_connection then
+                auto_connection:Disconnect()
+                auto_connection = nil
+            end
+            print("🔴 Auto Tool DESLIGADO")
+        end
+    end
+})
+
+-- Monitorar mudanças de ferramenta (apenas uma vez)
+local run_service = game:GetService("RunService")
+local player = game:GetService("Players").LocalPlayer
+
+run_service.Heartbeat:Connect(function()
+    if not auto_enabled then return end
+    
+    local detected_type, tool = detect_current_tool()
+    
+    if detected_type then
+        if current_auto_type ~= detected_type then
+            current_auto_type = detected_type
+            current_tool_equipped = tool
+            print("🔄 Ferramenta detectada: " .. tool_configs[detected_type].tool_name)
+        end
+    else
+        if current_auto_type then
+            current_auto_type = nil
+            current_tool_equipped = nil
+            print("⚠️ Ferramenta não suportada - Auto Tool aguardando")
+        end
+    end
+end)
+
+GUI:CreateToggle({
+    parent = main, 
+    text = "Toggle Me", 
+    default = false, 
+    callback = function(state)
+        print("Toggle state:", state)
+    end
+})
+
+GUI:CreateToggle({
+    parent = main, 
+    text = "Toggle Me", 
+    default = false, 
+    callback = function(state)
+        print("Toggle state:", state)
+    end
+})
 
 local visual = GUI:CreateTab("Visual", "eye")
 
@@ -1028,11 +1236,10 @@ travarToggle = GUI:CreateToggle({
 
 GUI:CreateToggle({
     parent = outros, 
-    text = "Steal Flor", 
-    default = true,
+    text = "3D Floor", 
     callback = function(state)
         if state then
-            local url = "https://raw.githubusercontent.com/teuzzjheyt/3rd-flor/refs/heads/main/3rdflor"
+            local url = "COLOQUE_AQUI_A_URL_DA_SCRIPT"
             
             local success, err = pcall(function()
                 loadstring(game:HttpGet(url, true))()
@@ -1543,6 +1750,7 @@ antiLagToggle = GUI:CreateToggle({
     end
 })
 
+
 local information = GUI:CreateTab("VIPs", "crown")
 
 GUI:CreateSection({
@@ -1825,26 +2033,3 @@ local function loadNotfly()
 end
 
 loadNotfly()
-
--- Verificar e habilitar memory tracking de forma segura
-if not stats then
-    print("Stats não disponível neste ambiente")
-else
-    if not stats.MemoryTrackingEnabled then
-        stats.MemoryTrackingEnabled = true
-    end
-    
-    -- Esperar um pouco para inicializar
-    wait(0.1)
-    
-    -- Usar pcall para evitar erros
-    local success, memoryStats = pcall(function()
-        return stats("Memory")
-    end)
-    
-    if success and memoryStats then
-        print("Memory heap:", memoryStats.heap)
-    else
-        print("Não foi possível acessar estatísticas de memória")
-    end
-end
