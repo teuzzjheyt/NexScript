@@ -125,12 +125,6 @@ GUI:CreateSection({
     text = "Main"
 })
 
-aimbotToggle = GUI:CreateToggle({
-    parent = main, 
-    text = "Aimbot Beta",
-    default = false, 
-    callback = function(state)
-        print("Aimbot state:", state)
         
 
 local visual = GUI:CreateTab("Visual", "eye")
