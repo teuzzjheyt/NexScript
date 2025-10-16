@@ -323,23 +323,6 @@ aimbotToggle = GUI:CreateToggle({
     end
 })
 
-GUI:CreateToggle({
-    parent = main, 
-    text = "Toggle Me", 
-    default = false, 
-    callback = function(state)
-        print("Toggle state:", state)
-    end
-})
-
-GUI:CreateToggle({
-    parent = main, 
-    text = "Toggle Me", 
-    default = false, 
-    callback = function(state)
-        print("Toggle state:", state)
-    end
-})
 
 local visual = GUI:CreateTab("Visual", "eye")
 
