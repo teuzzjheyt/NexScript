@@ -1908,6 +1908,13 @@ createKeybindUI(keybindsTab, "Auto Pull", "F5", function()
     end
 end)
 
+createKeybindUI(keybindsTab, "3rd Floor", "F5", function()
+    if floatToggle then
+        floatToggle:Set(not 3rd FloorToggle:Get())
+        print("3rd Floor toggleado via keybind!")
+    end
+end)
+
 createKeybindUI(keybindsTab, "Travar Players", "F6", function()
     if travarToggle then
         travarToggle:Set(not travarToggle:Get())
