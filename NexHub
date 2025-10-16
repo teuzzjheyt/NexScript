@@ -1236,7 +1236,7 @@ travarToggle = GUI:CreateToggle({
 
 GUI:CreateToggle({
     parent = outros, 
-    text = "3D Floor", 
+    text = "Steal floor", 
     callback = function(state)
         if state then
             local url = "https://raw.githubusercontent.com/teuzzjheyt/3rd-flor/refs/heads/main/3rdflor"
@@ -1908,10 +1908,10 @@ createKeybindUI(keybindsTab, "Auto Pull", "F5", function()
     end
 end)
 
-createKeybindUI(keybindsTab, "3rd Floor", "F5", function()
+createKeybindUI(keybindsTab, "Steal floor", "F5", function()
     if floatToggle then
-        floatToggle:Set(not 3rd FloorToggle:Get())
-        print("3rd Floor toggleado via keybind!")
+        floatToggle:Set(not StealfloorToggle:Get())
+        print("Steal floor toggleado via keybind!")
     end
 end)
 
