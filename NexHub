@@ -1004,6 +1004,272 @@ timerEspToggle = GUI:CreateToggle({
     end
 })
 
+
+OwnerEspToggle = GUI:CreateToggle({
+    parent = visual, 
+    text = "Esp Owner Base", 
+    default = true, 
+    callback = function(state)
+        -- ESP System para Detectar Donos dos Plots - COR ROXA
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+        local Workspace = game:GetService("Workspace")
+        local LocalPlayer = Players.LocalPlayer
+        local UserInputService = game:GetService("UserInputService")
+
+        -- Variáveis do ESP
+        local espActive = state
+        local espObjects = {}
+        local updateConnection = nil
+
+        -- Função para criar ESP SEM FUNDO COR ROXA
+        local function createESP(plot, ownerName)
+            if espObjects[plot] then
+                espObjects[plot]:Destroy()
+            end
+            
+            -- Criar BillboardGui SEM FUNDO
+            local billboard = Instance.new("BillboardGui")
+            billboard.Name = "PlotESP"
+            billboard.Size = UDim2.new(0, 400, 0, 60)
+            billboard.StudsOffset = Vector3.new(0, 15, 0)
+            billboard.AlwaysOnTop = true
+            billboard.Active = true
+            billboard.ClipsDescendants = false
+            billboard.MaxDistance = 5000
+            billboard.Enabled = espActive
+            
+            -- Criar texto ROXO SEM FUNDO
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.BackgroundTransparency = 1 -- FUNDO COMPLETAMENTE TRANSPARENTE
+            textLabel.Text = ownerName
+            textLabel.TextColor3 = Color3.fromRGB(170, 0, 255) -- COR ROXA
+            textLabel.TextStrokeTransparency = 0.3 -- CONTORNO SUAVE
+            textLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+            textLabel.TextSize = 20
+            textLabel.Font = Enum.Font.GothamBold
+            textLabel.TextWrapped = false
+            textLabel.Parent = billboard
+            
+            -- Colocar no Workspace
+            billboard.Parent = Workspace
+            
+            -- Posicionar no plot
+            local plotSign = plot:FindFirstChild("PlotSign")
+            local plotPrimaryPart = plot:IsA("Model") and plot.PrimaryPart or plot:FindFirstChildWhichIsA("BasePart")
+            
+            if plotSign then
+                billboard.Adornee = plotSign
+            elseif plotPrimaryPart then
+                billboard.Adornee = plotPrimaryPart
+            else
+                billboard.Adornee = plot
+            end
+            
+            espObjects[plot] = billboard
+            return billboard
+        end
+
+        -- MÉTODO ESPECIAL: Detectar e ignorar MEU nickname
+        local function shouldIgnorePlot(plot)
+            local plotSign = plot:FindFirstChild("PlotSign")
+            if not plotSign then 
+                return false
+            end
+            
+            -- Coletar TODOS os textos da placa
+            local allTexts = {}
+            
+            for _, child in pairs(plotSign:GetDescendants()) do
+                if child:IsA("TextLabel") or child:IsA("TextButton") then
+                    local text = child.Text or ""
+                    if text ~= "" then
+                        table.insert(allTexts, text)
+                        
+                        -- MÉTODO 1: Verificar se algum texto é EXATAMENTE meu nickname
+                        if text == LocalPlayer.Name then
+                            return true -- IGNORAR plot com meu nickname
+                        end
+                        
+                        -- MÉTODO 2: Verificar se contém meu nickname em padrões
+                        if text:find(LocalPlayer.Name) then
+                            return true -- IGNORAR plot que menciona meu nickname
+                        end
+                        
+                        -- MÉTODO 3: Verificar padrão "[MeuNome]'s Base"
+                        if text:find("'s Base") then
+                            local ownerName = text:match("^(.+)'s Base$")
+                            if ownerName and ownerName == LocalPlayer.Name then
+                                return true -- IGNORAR minha base
+                            end
+                        end
+                        
+                        -- MÉTODO 4: Verificar padrão "de [MeuNome]"
+                        if text:find("de ") then
+                            local ownerName = text:match("de%s+(.+)")
+                            if ownerName and ownerName == LocalPlayer.Name then
+                                return true -- IGNORAR minha base
+                            end
+                        end
+                    end
+                end
+            end
+            
+            return false -- Não ignorar, mostrar ESP
+        end
+
+        -- APENAS MÉTODO 5 - Análise do PlotSign (OTIMIZADO)
+        local function getPlotOwner(plot)
+            -- PRIMEIRO: Verificar se devemos ignorar este plot (minha base)
+            if shouldIgnorePlot(plot) then
+                return nil -- IGNORAR MINHA BASE
+            end
+            
+            local plotSign = plot:FindFirstChild("PlotSign")
+            if not plotSign then 
+                return "Sem Dono"
+            end
+            
+            -- Busca RÁPIDA pelos textos
+            for _, child in pairs(plotSign:GetDescendants()) do
+                if child:IsA("TextLabel") or child:IsA("TextButton") then
+                    local text = child.Text or ""
+                    if text ~= "" then
+                        -- Padrão 1: "[Nome]'s Base" (como "GODZIL's Base")
+                        if text:find("'s Base") then
+                            local ownerName = text:match("^(.+)'s Base$")
+                            if ownerName and ownerName ~= LocalPlayer.Name then -- IGNORAR MEU NOME
+                                return ownerName
+                            end
+                        end
+                        
+                        -- Padrão 2: "Base de [Nome]" (formato alternativo)
+                        if text:find("Base de") then
+                            local ownerName = text:match("Base de%s+(.+)")
+                            if ownerName then
+                                ownerName = ownerName:gsub("%*", ""):gsub("\n", " "):match("([%w_]+)")
+                                if ownerName and ownerName ~= LocalPlayer.Name then -- IGNORAR MEU NOME
+                                    return ownerName
+                                end
+                            end
+                        end
+                        
+                        -- Verificar se é um nome de jogador direto (e não sou eu)
+                        for _, player in ipairs(Players:GetPlayers()) do
+                            if text == player.Name and player ~= LocalPlayer then -- IGNORAR MEU NOME
+                                return player.Name
+                            end
+                        end
+                        
+                        -- Se não for textos comuns, usar como texto alternativo (desde que não seja meu nome)
+                        if text ~= "YOUR BASE" and text ~= "Sem Dono" and text ~= "Semi Dono" and not text:find("INHEIRO") and text ~= LocalPlayer.Name then
+                            if text:find("'s Base") then
+                                local ownerName = text:match("^(.+)'s Base$")
+                                if ownerName and ownerName ~= LocalPlayer.Name then -- IGNORAR MEU NOME
+                                    return ownerName
+                                end
+                            end
+                            return text
+                        end
+                    end
+                end
+            end
+            
+            return "Sem Dono"
+        end
+
+        -- Função principal do ESP (OTIMIZADA)
+        local function updateESP()
+            local plots = Workspace:FindFirstChild("Plots")
+            if not plots then 
+                return 
+            end
+            
+            if not espActive then
+                for plot, espObject in pairs(espObjects) do
+                    if espObject then espObject:Destroy() end
+                end
+                espObjects = {}
+                return
+            end
+            
+            local plotCount = 0
+            local detectedCount = 0
+            local ignoredCount = 0
+            
+            -- Atualização RÁPIDA
+            for _, plot in ipairs(plots:GetChildren()) do
+                if plot:IsA("Model") or plot:IsA("Part") then
+                    plotCount = plotCount + 1
+                    local ownerName = getPlotOwner(plot)
+                    
+                    if ownerName and ownerName ~= "Sem Dono" then
+                        createESP(plot, ownerName)
+                        detectedCount = detectedCount + 1
+                    else
+                        -- Se for minha base ou sem dono, remover ESP se existir
+                        if espObjects[plot] then
+                            espObjects[plot]:Destroy()
+                            espObjects[plot] = nil
+                        end
+                        if shouldIgnorePlot(plot) then
+                            ignoredCount = ignoredCount + 1
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Controle do ESP baseado no estado do toggle
+        if state then -- Se ativado
+            espActive = true
+            
+            -- ATUALIZAÇÃO RÁPIDA - Heartbeat em vez de wait
+            if updateConnection then
+                updateConnection:Disconnect()
+            end
+            
+            updateConnection = RunService.Heartbeat:Connect(function()
+                updateESP()
+            end)
+            
+        else -- Se desativado
+            espActive = false
+            
+            -- Desconectar a conexão de atualização
+            if updateConnection then
+                updateConnection:Disconnect()
+                updateConnection = nil
+            end
+            
+            -- Limpar todos os ESPs
+            for plot, espObject in pairs(espObjects) do
+                if espObject then espObject:Destroy() end
+            end
+            espObjects = {}
+            
+        end
+
+        -- Reconexão quando o character spawnar
+        LocalPlayer.CharacterAdded:Connect(function()
+            if espActive then
+                -- Reconectar a atualização rápida
+                if updateConnection then
+                    updateConnection:Disconnect()
+                end
+                updateConnection = RunService.Heartbeat:Connect(function()
+                    updateESP()
+                end)
+            end
+        end)
+
+        if not LocalPlayer.Character then
+            LocalPlayer.CharacterAdded:Wait()
+        end
+    end
+})
+
 local outros = GUI:CreateTab("Outros", "shield")
 
 GUI:CreateSection({
